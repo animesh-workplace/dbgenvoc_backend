@@ -84,6 +84,8 @@ GENOMIC_TABLES = {
 
 SPECIAL_TABLES = {"pathway", "genelist", "samplelist", "uniprot_fixed"}
 
+GERMLINE_TABLES = {"exome_germline", "wg_germline", "targeted_germline"}
+
 
 # Helper functions
 def get_model_class(table_name: str):
@@ -91,7 +93,7 @@ def get_model_class(table_name: str):
     if table_name not in TABLE_REGISTRY:
         raise HTTPException(
             status_code=404,
-            detail=f"Table '{table_name}' not found. Available tables: {list(TABLE_REGISTRY.keys())}",
+            detail=f"Table '{table_name}' not found.",
         )
     return TABLE_REGISTRY[table_name]
 
