@@ -21,7 +21,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.insert(0, parent_dir)
 from app.models import *
-from app.db.session import Base
+from app.session import Base
 
 target_metadata = Base.metadata
 # target_metadata = None
