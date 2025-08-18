@@ -1,10 +1,6 @@
-import os
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import create_engine, MetaData
 from sqlalchemy.ext.declarative import declarative_base
-
-# For MySQL (original)
-# SQLALCHEMY_DATABASE_URL = "mysql://user:password@localhost/oralcancerdb"
 
 # For SQLite (converted)
 SQLALCHEMY_DATABASE_URL = "sqlite:///database/database.sqlite3"
