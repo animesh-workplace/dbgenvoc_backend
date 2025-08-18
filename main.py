@@ -1,27 +1,9 @@
-from enum import Enum
-from app.models import (
-    EsTcga,
-    Pathway,
-    Uniprot,
-    Genelist,
-    EsJournal,
-    WgSomatic,
-    Samplelist,
-    WgGermline,
-    ExomeSomatic,
-    ExomeGermline,
-    TargetedSomatic,
-    TargetedGermline,
-)
 from app.session import get_db
 from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
-from sqlalchemy import func, or_, and_
-from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Optional, Dict, Any, Union
-from fastapi import FastAPI, Depends, Query, HTTPException, Path
+from fastapi import FastAPI, Depends, Path
 from app.api.search import generic_search
 from app.api.aggregate import generic_aggregate
+from fastapi.middleware.cors import CORSMiddleware
 from app.api.concate_aggregate import generic_concatenated_aggregate
 from app.schema import (
     SearchRequest,
