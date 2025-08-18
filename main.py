@@ -35,7 +35,6 @@ async def TABLE_SEARCH_API(
 ):
     """Generic search across any table."""
     authenticated_user = require_germline_access(table_name, token_info)
-    print(f"Authenticated user: {authenticated_user}")
     if table_name in GERMLINE_TABLES and not authenticated_user:
         raise HTTPException(
             status_code=403,
