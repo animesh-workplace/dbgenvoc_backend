@@ -1,6 +1,6 @@
 from app.session import Base
 from sqlalchemy.sql import func
-from sqlalchemy import Column, Integer, BigInteger, String, Text, DateTime
+from sqlalchemy import Column, Integer, BigInteger, String, Text, DateTime, Boolean
 
 
 class EsJournal(Base):
@@ -276,3 +276,18 @@ class Uniprot(Base):
     Hugo_Symbol = Column(String(20))
     Accession_Id = Column(String(20))
     Structure = Column(Text)
+
+
+class ApiToken(Base):
+    __tablename__ = "api_tokens"
+
+    token_id = Column(Integer, primary_key=True, autoincrement=True)
+    token = Column(String(255), unique=True, index=True, nullable=False)
+    user_identifier = Column(String(100), nullable=False)
+    description = Column(String(500), nullable=True)  # Purpose of token
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    expires_at = Column(DateTime, nullable=True)  # NULL means no expiration
+    last_used_at = Column(DateTime, nullable=True)
+    permissions = Column(Text, nullable=True)  # JSON string of permissions
+    ip_whitelist = Column(Text, nullable=True)  # JSON array of allowed IPs
