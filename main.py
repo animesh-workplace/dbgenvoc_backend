@@ -13,7 +13,7 @@ from app.models import (
     TargetedSomatic,
     TargetedGermline,
 )
-from app.db.session import get_db
+from app.session import get_db
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from sqlalchemy import func, or_, and_
@@ -34,69 +34,69 @@ BASE_URL = "/dbgenvoc/api/"
 
 # Table registry mapping table names to models
 TABLE_REGISTRY = {
-    "es_journal": EsJournal,
     "es_tcga": EsTcga,
-    "exome_germline": ExomeGermline,
-    "exome_somatic": ExomeSomatic,
-    "wg_germline": WgGermline,
-    "wg_somatic": WgSomatic,
-    "targeted_germline": TargetedGermline,
-    "targeted_somatic": TargetedSomatic,
     "pathway": Pathway,
     "genelist": Genelist,
-    "samplelist": Samplelist,
+    "es_journal": EsJournal,
+    "wg_somatic": WgSomatic,
     "uniprot_fixed": Uniprot,
+    "samplelist": Samplelist,
+    "wg_germline": WgGermline,
+    "exome_somatic": ExomeSomatic,
+    "exome_germline": ExomeGermline,
+    "targeted_somatic": TargetedSomatic,
+    "targeted_germline": TargetedGermline,
 }
 
 # Define searchable columns for each table type
 SEARCHABLE_COLUMNS = {
     # Genomic tables (similar structure)
     "genomic_tables": {
-        "primary": ["gene", "chrom", "disease", "variant_class", "variant_type"],
         "secondary": [
             "dbsnp_rs",
-            "protein_change",
-            "genome_change",
-            "tumor_sample_barcode",
             "sample_id",
+            "genome_change",
+            "protein_change",
+            "tumor_sample_barcode",
         ],
         "all": [
             "gene",
-            "entrez_gene_id",
+            "end",
             "chrom",
             "start",
-            "end",
-            "variant_class",
-            "variant_type",
-            "ref_allele",
-            "tumor_seq_allele2",
-            "dbsnp_rs",
-            "tumor_sample_barcode",
-            "sample_id",
-            "genome_change",
-            "annotation_transcript",
-            "protein_change",
             "disease",
             "remarks",
+            "dbsnp_rs",
+            "sample_id",
+            "ref_allele",
+            "variant_type",
+            "genome_change",
+            "variant_class",
+            "protein_change",
+            "entrez_gene_id",
+            "tumor_seq_allele2",
+            "tumor_sample_barcode",
+            "annotation_transcript",
         ],
+        "primary": ["gene", "chrom", "disease", "variant_class", "variant_type"],
     },
     # Special tables
-    "pathway": ["pathway_name", "path_gene", "disease"],
     "genelist": ["gene"],
     "samplelist": ["sample_id"],
     "uniprot_fixed": ["Hugo_Symbol", "Accession_Id"],
+    "pathway": ["pathway_name", "path_gene", "disease"],
 }
 
 # Table categories for different handling
 GENOMIC_TABLES = {
-    "es_journal",
     "es_tcga",
-    "exome_germline",
-    "exome_somatic",
-    "wg_germline",
+    "es_journal",
     "wg_somatic",
-    "targeted_germline",
+    "wg_germline",
+    "exome_somatic",
+    "exome_germline",
     "targeted_somatic",
+    "targeted_germline",
 }
 
 SPECIAL_TABLES = {"pathway", "genelist", "samplelist", "uniprot_fixed"}
@@ -104,19 +104,19 @@ SPECIAL_TABLES = {"pathway", "genelist", "samplelist", "uniprot_fixed"}
 
 # Pydantic models
 class AggregationType(str, Enum):
-    count = "count"
     sum = "sum"
     avg = "avg"
     min = "min"
     max = "max"
+    count = "count"
     distinct_count = "distinct_count"
 
 
 class GenericSearchResponse(BaseModel):
-    table_name: str
-    total_results: int
     page: int
     page_size: int
+    table_name: str
+    total_results: int
     results: List[Dict[str, Any]]
 
 
@@ -130,11 +130,11 @@ class GenericAggregationRequest(BaseModel):
 
 
 class GenericAggregationResponse(BaseModel):
-    table_name: str
     column: str
+    table_name: str
+    total_records: int
     aggregation_type: str
     result: Union[Dict[str, Any], List[Dict[str, Any]]]
-    total_records: int
 
 
 class ConcatenatedAggregationRequest(BaseModel):
@@ -201,36 +201,6 @@ def validate_columns(model_class, column_names: List[str]) -> List[str]:
 def row_to_dict(row) -> Dict[str, Any]:
     """Convert SQLAlchemy row to dictionary."""
     return {column.name: getattr(row, column.name) for column in row.__table__.columns}
-
-
-# Database dependency
-def get_db():
-    # Replace with your actual database session
-    from app.db.session import SessionLocal
-
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-# API Endpoints
-@app.get("/tables")
-async def get_available_tables():
-    """Get list of available tables and their searchable columns."""
-    table_info = {}
-    for table_name, model_class in TABLE_REGISTRY.items():
-        columns = [col.name for col in model_class.__table__.columns]
-        searchable = get_searchable_columns(table_name)
-        table_info[table_name] = {
-            "columns": columns,
-            "searchable_columns": searchable,
-            "primary_key": [
-                col.name for col in model_class.__table__.primary_key.columns
-            ],
-        }
-    return {"tables": table_info}
 
 
 @app.get("/{table_name}/search", response_model=GenericSearchResponse)
