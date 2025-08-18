@@ -58,5 +58,4 @@ async def generic_search(table_name, request: SearchRequest, db):
         )
 
     except Exception as e:
-        print(f"Search error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
