@@ -6,25 +6,17 @@ from app.core import (
 )
 from sqlalchemy import or_
 from fastapi import HTTPException
-from app.schema import SearchResponse
+from app.schema import SearchResponse, SearchRequest
 
 
-async def generic_search(
-    table_name,
-    term,
-    page,
-    page_size,
-    exact_match,
-    search_columns,
-    db,
-):
+async def generic_search(table_name, request: SearchRequest, db):
     """Generic search across any table."""
     try:
         model_class = get_model_class(table_name)
 
         # Get searchable columns
-        if search_columns:
-            columns_to_search = validate_columns(model_class, search_columns)
+        if request.search_columns:
+            columns_to_search = validate_columns(model_class, request.search_columns)
         else:
             columns_to_search = get_searchable_columns(table_name)
             # Filter to only existing columns
@@ -39,10 +31,10 @@ async def generic_search(
         search_conditions = []
         for column in columns_to_search:
             col_attr = getattr(model_class, column)
-            if exact_match:
-                search_conditions.append(col_attr == term)
+            if request.exact_match:
+                search_conditions.append(col_attr == request.term)
             else:
-                search_conditions.append(col_attr.ilike(f"%{term}%"))
+                search_conditions.append(col_attr.ilike(f"%{request.term}%"))
 
         if search_conditions:
             query = query.filter(or_(*search_conditions))
@@ -51,18 +43,18 @@ async def generic_search(
         total_results = query.count()
 
         # Apply pagination
-        offset = (page - 1) * page_size
-        results = query.offset(offset).limit(page_size).all()
+        offset = (request.page - 1) * request.page_size
+        results = query.offset(offset).limit(request.page_size).all()
 
         # Convert to dictionaries
         result_dicts = [row_to_dict(row) for row in results]
 
         return SearchResponse(
+            page=request.page,
+            results=result_dicts,
             table_name=table_name,
             total_results=total_results,
-            page=page,
-            page_size=page_size,
-            results=result_dicts,
+            page_size=request.page_size,
         )
 
     except Exception as e:
