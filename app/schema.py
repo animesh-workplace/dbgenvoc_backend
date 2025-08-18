@@ -1,4 +1,5 @@
 from enum import Enum
+from datetime import datetime
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Union
 
@@ -66,3 +67,20 @@ class ConcatenatedAggregationRequest(BaseModel):
     aggregation_type: AggregationType = Field(
         AggregationType.count, description="Type of aggregation to perform"
     )
+
+
+class TokenCreateRequest(BaseModel):
+    user_identifier: str
+    description: Optional[str] = None
+    expires_in_days: Optional[int] = None  # None means no expiration
+    permissions: Optional[List[str]] = None
+    ip_whitelist: Optional[List[str]] = None
+
+
+class TokenResponse(BaseModel):
+    token: str
+    token_id: int
+    user_identifier: str
+    created_at: datetime
+    description: Optional[str]
+    expires_at: Optional[datetime]
