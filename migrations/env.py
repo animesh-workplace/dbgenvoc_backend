@@ -47,8 +47,9 @@ def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
-        target_metadata=target_metadata,
         literal_binds=True,
+        render_as_batch=True,
+        target_metadata=target_metadata,
         dialect_opts={"paramstyle": "named"},
     )
 
@@ -70,7 +71,18 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            render_as_batch=True,  # Enable batch mode for SQLite
+            batch_naming_convention={
+                "ix": "ix_%(column_0_label)s",
+                "uq": "uq_%(table_name)s_%(column_0_name)s",
+                "ck": "ck_%(table_name)s_%(constraint_name)s",
+                "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+                "pk": "pk_%(table_name)s",
+            },
+        )
 
         with context.begin_transaction():
             context.run_migrations()
