@@ -5,7 +5,7 @@ from app.core import GERMLINE_TABLES
 from app.api.search import generic_search
 from app.api.aggregate import generic_aggregate
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, Depends, Path, HTTPException
+from fastapi import FastAPI, Depends, Path, HTTPException, APIRouter
 from app.auth import verify_germline_token, TokenInfo, require_germline_access
 from app.api.concate_aggregate import generic_concatenated_aggregate
 from app.schema import (
@@ -16,17 +16,11 @@ from app.schema import (
     ConcatenatedAggregationRequest,
 )
 
-app = FastAPI()
-origins = ["http://localhost:3011", "http://10.10.6.80"]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-)
-BASE_URL = "/dbgenvoc/api/"
+api_router = APIRouter()
+BASE_URL = "/dbgenvoc/v2/api"
 
 
-@app.get("/{table_name}/search", response_model=SearchResponse)
+@api_router.get("/{table_name}/search", response_model=SearchResponse)
 async def TABLE_SEARCH_API(
     request: SearchRequest,
     db: Session = Depends(get_db),
@@ -43,7 +37,7 @@ async def TABLE_SEARCH_API(
     return await generic_search(table_name=table_name, request=request, db=db)
 
 
-@app.post("/{table_name}/aggregate", response_model=AggregationResponse)
+@api_router.post("/{table_name}/aggregate", response_model=AggregationResponse)
 async def TABLE_AGGREGATE_API(
     request: AggregationRequest,
     db: Session = Depends(get_db),
@@ -60,7 +54,9 @@ async def TABLE_AGGREGATE_API(
     return await generic_aggregate(request=request, db=db, table_name=table_name)
 
 
-@app.post("/{table_name}/aggregate-concatenated", response_model=AggregationResponse)
+@api_router.post(
+    "/{table_name}/aggregate-concatenated", response_model=AggregationResponse
+)
 async def TABLE_AGGREGATE_CONCATE_API(
     request: ConcatenatedAggregationRequest,
     db: Session = Depends(get_db),
@@ -77,3 +73,13 @@ async def TABLE_AGGREGATE_CONCATE_API(
     return await generic_concatenated_aggregate(
         request=request, table_name=table_name, db=db
     )
+
+
+app = FastAPI()
+origins = ["http://localhost:3011", "http://10.10.6.80"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+)
+app.include_router(api_router, prefix=BASE_URL)
