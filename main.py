@@ -20,7 +20,7 @@ api_router = APIRouter()
 BASE_URL = "/dbgenvoc/api/v2"
 
 
-@api_router.get("/{table_name}/search", response_model=SearchResponse)
+@api_router.post("/{table_name}/search", response_model=SearchResponse)
 async def TABLE_SEARCH_API(
     request: SearchRequest,
     db: Session = Depends(get_db),
