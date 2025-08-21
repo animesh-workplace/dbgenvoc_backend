@@ -76,10 +76,10 @@ async def TABLE_AGGREGATE_CONCATE_API(
 
 
 app = FastAPI()
-origins = ["http://localhost:3011", "http://10.10.6.80"]
+origins = ["http://10.10.6.80"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
 )
 app.include_router(api_router, prefix=BASE_URL)
