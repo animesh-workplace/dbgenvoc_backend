@@ -17,7 +17,7 @@ from app.schema import (
 )
 
 api_router = APIRouter()
-BASE_URL = "/dbgenvoc/v2/api"
+BASE_URL = "/dbgenvoc/api/v2"
 
 
 @api_router.get("/{table_name}/search", response_model=SearchResponse)
