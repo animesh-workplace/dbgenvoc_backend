@@ -81,7 +81,7 @@ async def generic_concatenated_aggregate(
                     for i, group_col in enumerate(request.group_by):
                         result_dict[group_col] = result[i]
                     result_dict["concatenated_value"] = result[-2]
-                    result_dict["count"] = result[-1]
+                    result_dict["aggregated_value"] = result[-1]
                     formatted_results.append(result_dict)
 
                 return AggregationResponse(
@@ -112,7 +112,7 @@ async def generic_concatenated_aggregate(
                 formatted_results = [
                     {
                         "concatenated_value": result.concatenated_value,
-                        "count": result.count,
+                        "aggregated_value": result.count,
                     }
                     for result in results
                 ]
