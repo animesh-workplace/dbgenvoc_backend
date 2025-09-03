@@ -13,13 +13,26 @@ class AggregationType(str, Enum):
     distinct_count = "distinct_count"  # Count of distinct values
 
 
+class SearchMode(str, Enum):
+    """Search mode for multiple terms"""
+
+    ANY = "any"  # OR logic - match any term
+    ALL = "all"  # AND logic - match all terms
+
+
 class SearchRequest(BaseModel):
-    term: str = Field(..., description="Search term")
+    term: Union[str, List[str]] = Field(
+        ..., description="Search term(s) - single string or array of strings"
+    )
     page: int = Field(1, ge=1, description="Page number")
     page_size: int = Field(10, ge=1, le=100, description="Results per page")
     exact_match: bool = Field(False, description="Exact match or partial match")
     search_columns: Optional[List[str]] = Field(
         None, description="Specific columns to search"
+    )
+    search_mode: SearchMode = Field(
+        SearchMode.ANY,
+        description="Search mode: 'any' (OR logic) or 'all' (AND logic) for multiple terms",
     )
 
 
@@ -28,6 +41,8 @@ class SearchResponse(BaseModel):
     page_size: int = Field(..., description="Number of results per page")
     table_name: str = Field(..., description="Name of the table searched")
     total_results: int = Field(..., description="Total number of results found")
+    search_terms: List[str] = Field(..., description="Terms that were searched")
+    search_mode: str = Field(..., description="Search mode used")
     results: List[Dict[str, Any]] = Field(
         ..., description="List of search results as dictionaries"
     )
