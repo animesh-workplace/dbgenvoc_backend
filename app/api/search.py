@@ -6,13 +6,25 @@ from app.core import (
 )
 from sqlalchemy import or_
 from fastapi import HTTPException
-from app.schema import SearchResponse, SearchRequest
+from app.schema import SearchResponse, SearchRequest, SearchMode
 
 
 async def generic_search(table_name, request: SearchRequest, db):
-    """Generic search across any table."""
+    """Generic search across any table with support for multiple terms."""
     try:
         model_class = get_model_class(table_name)
+
+        # Normalize terms to always be a list
+        search_terms = []
+        if isinstance(request.term, str):
+            search_terms = [request.term]
+        elif isinstance(request.term, list):
+            search_terms = [term.strip() for term in request.term if term.strip()]
+
+        if not search_terms:
+            raise HTTPException(
+                status_code=400, detail="At least one search term is required"
+            )
 
         # Get searchable columns
         if request.search_columns:
@@ -27,17 +39,34 @@ async def generic_search(table_name, request: SearchRequest, db):
         # Build query
         query = db.query(model_class)
 
-        # Create search conditions
-        search_conditions = []
-        for column in columns_to_search:
-            col_attr = getattr(model_class, column)
-            if request.exact_match:
-                search_conditions.append(col_attr == request.term)
-            else:
-                search_conditions.append(col_attr.ilike(f"%{request.term}%"))
+        # Create search conditions based on search mode
+        if request.search_mode == SearchMode.ANY:
+            # OR logic: match ANY term in ANY column
+            search_conditions = []
+            for column in columns_to_search:
+                col_attr = getattr(model_class, column)
+                for term in search_terms:
+                    if request.exact_match:
+                        search_conditions.append(col_attr == term)
+                    else:
+                        search_conditions.append(col_attr.ilike(f"%{term}%"))
 
-        if search_conditions:
-            query = query.filter(or_(*search_conditions))
+            if search_conditions:
+                query = query.filter(or_(*search_conditions))
+
+        elif request.search_mode == SearchMode.ALL:
+            # AND logic: must match ALL terms (each term in at least one column)
+            for term in search_terms:
+                term_conditions = []
+                for column in columns_to_search:
+                    col_attr = getattr(model_class, column)
+                    if request.exact_match:
+                        term_conditions.append(col_attr == term)
+                    else:
+                        term_conditions.append(col_attr.ilike(f"%{term}%"))
+
+                if term_conditions:
+                    query = query.filter(or_(*term_conditions))
 
         # Get total count
         total_results = query.count()
@@ -55,6 +84,8 @@ async def generic_search(table_name, request: SearchRequest, db):
             table_name=table_name,
             total_results=total_results,
             page_size=request.page_size,
+            search_terms=search_terms,
+            search_mode=request.search_mode.value,
         )
 
     except Exception as e:
