@@ -1,6 +1,6 @@
 from enum import Enum
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Dict, Any, Union
 
 
@@ -13,11 +13,14 @@ class AggregationType(str, Enum):
     distinct_count = "distinct_count"  # Count of distinct values
 
 
-class SearchMode(str, Enum):
-    """Search mode for multiple terms"""
+class SortOrder(str, Enum):
+    ASC = "asc"
+    DESC = "desc"
 
-    ANY = "any"  # OR logic - match any term
-    ALL = "all"  # AND logic - match all terms
+
+class SearchMode(str, Enum):
+    ANY = "any"
+    ALL = "all"
 
 
 class SearchRequest(BaseModel):
@@ -34,6 +37,21 @@ class SearchRequest(BaseModel):
         SearchMode.ANY,
         description="Search mode: 'any' (OR logic) or 'all' (AND logic) for multiple terms",
     )
+    sort_by: Optional[str] = Field(
+        None, description="Column name to sort the results by"
+    )
+    sort_order: SortOrder = Field(
+        SortOrder.ASC,
+        description="Sort order: 'asc' for ascending, 'desc' for descending",
+    )
+
+    @validator("sort_by")
+    def validate_sort_by(cls, v):
+        if v is not None:
+            v = v.strip()
+            if not v:
+                return None
+        return v
 
 
 class SearchResponse(BaseModel):
@@ -43,6 +61,8 @@ class SearchResponse(BaseModel):
     total_results: int = Field(..., description="Total number of results found")
     search_terms: List[str] = Field(..., description="Terms that were searched")
     search_mode: str = Field(..., description="Search mode used")
+    sort_by: Optional[str] = Field(..., description="Column used for sorting")
+    sort_order: str = Field(..., description="Sort order applied")
     results: List[Dict[str, Any]] = Field(
         ..., description="List of search results as dictionaries"
     )
