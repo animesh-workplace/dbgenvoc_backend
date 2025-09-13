@@ -10,10 +10,8 @@ async def unified_autocomplete(
 ):
     """Unified autocomplete returning genes and pathways with pathway_genes"""
     try:
-        if not term or len(term.strip()) < 2:
-            raise HTTPException(
-                status_code=400, detail="Search term must be at least 2 characters long"
-            )
+        if not term:
+            raise HTTPException(status_code=400, detail="Search term must be there")
 
         suggestions = []
 
