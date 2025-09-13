@@ -134,3 +134,21 @@ class AutocompleteRequest(BaseModel):
 
 class AutocompleteResponse(BaseModel):
     suggestions: List[AutocompleteSuggestion]
+
+
+class GenomicRegionSuggestion(BaseModel):
+    value: str
+    type: str = "genomic_region"
+    table: str
+    chromosome: str
+    start: int
+    end: Optional[int] = None
+
+
+class GenomicRegionResponse(BaseModel):
+    suggestions: List[GenomicRegionSuggestion]
+
+
+class GenomicRegionRequest(BaseModel):
+    term: str
+    limit: int = 10
