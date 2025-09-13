@@ -2,7 +2,7 @@ import re
 from sqlalchemy import and_
 from typing import Tuple, Optional
 from app.core import get_model_class
-from app.schema import GenomicRegionSuggestion
+from app.schema import AutocompleteSuggestion, SuggestionType
 
 GENOMIC_TABLES = [
     "es_tcga",
@@ -59,8 +59,48 @@ def format_genomic_region(
         return f"{chromosome}:{start}"
 
 
-async def search_genomic_regions(chrom: str, start: int, end: int, limit: int, db):
+async def search_genes_and_pathways(term: str, limit: int, db):
+    """Search for genes and pathways"""
+    suggestions = []
+
+    # Search in Genelist table (genes)
+    Genelist = get_model_class("genelist")
+    gene_results = (
+        db.query(Genelist.gene)
+        .filter(Genelist.gene.ilike(f"{term}%"))
+        .order_by(Genelist.gene)
+        .limit(limit)
+        .all()
+    )
+
+    for gene in gene_results:
+        suggestions.append(
+            AutocompleteSuggestion(value=gene[0], type=SuggestionType.GENE)
+        )
+
+    # Search in Pathway table (pathway names)
+    Pathway = get_model_class("pathway")
+    pathway_results = (
+        db.query(Pathway.pathway_name, Pathway.path_gene)
+        .filter(Pathway.pathway_name.ilike(f"{term}%"))
+        .order_by(Pathway.pathway_name)
+        .limit(limit)
+        .all()
+    )
+
+    for pathway_name, path_gene in pathway_results:
+        suggestions.append(
+            AutocompleteSuggestion(
+                value=pathway_name, type=SuggestionType.PATHWAY, pathway_genes=path_gene
+            )
+        )
+
+    return suggestions
+
+
+async def search_genomic_regions(parsed_region: tuple, limit: int, db):
     """Search for exact or overlapping genomic regions"""
+    chrom, start, end = parsed_region
     suggestions = []
 
     for table_name in GENOMIC_TABLES:
@@ -85,7 +125,7 @@ async def search_genomic_regions(chrom: str, start: int, end: int, limit: int, d
                     )
                 )
                 .order_by(model_class.start)
-                .limit(limit // len(GENOMIC_TABLES))  # Distribute limit across tables
+                .limit(limit // len(GENOMIC_TABLES))
             )
 
             results = query.all()
@@ -96,9 +136,9 @@ async def search_genomic_regions(chrom: str, start: int, end: int, limit: int, d
                 )
 
                 suggestions.append(
-                    GenomicRegionSuggestion(
+                    AutocompleteSuggestion(
                         value=region_str,
-                        type="genomic_region",
+                        type=SuggestionType.GENOMIC_REGION,
                         table=table_name,
                         chromosome=result.chromosome,
                         start=result.start,
@@ -106,11 +146,11 @@ async def search_genomic_regions(chrom: str, start: int, end: int, limit: int, d
                     )
                 )
 
-        except Exception as e:
+        except Exception:
             # Skip tables that cause errors
             continue
 
-    return suggestions[:limit]
+    return suggestions
 
 
 async def search_partial_genomic_region(term: str, limit: int, db):
@@ -143,9 +183,9 @@ async def search_partial_genomic_region(term: str, limit: int, db):
                 region_str = format_genomic_region(chrom, start, end)
 
                 suggestions.append(
-                    GenomicRegionSuggestion(
+                    AutocompleteSuggestion(
                         value=region_str,
-                        type="genomic_region",
+                        type=SuggestionType.GENOMIC_REGION,
                         table=table_name,
                         chromosome=chrom,
                         start=start,
@@ -153,8 +193,8 @@ async def search_partial_genomic_region(term: str, limit: int, db):
                     )
                 )
 
-        except Exception as e:
+        except Exception:
             # Skip tables that cause errors
             continue
 
-    return suggestions[:limit]
+    return suggestions
