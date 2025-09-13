@@ -121,19 +121,29 @@ class TokenResponse(BaseModel):
     expires_at: Optional[datetime]
 
 
+class SuggestionType(str, Enum):
+    GENE = "gene"
+    PATHWAY = "pathway"
+    GENOMIC_REGION = "genomic_region"
+
+
 class AutocompleteSuggestion(BaseModel):
-    type: str  # "gene" or "pathway"
     value: str
-    pathway_genes: Optional[str] = None  # Only for pathway type
+    type: SuggestionType
+    pathway_genes: Optional[str] = None  # For pathway type
+    table: Optional[str] = None  # For genomic_region type
+    chromosome: Optional[str] = None  # For genomic_region type
+    start: Optional[int] = None  # For genomic_region type
+    end: Optional[int] = None  # For genomic_region type
+
+
+class AutocompleteResponse(BaseModel):
+    suggestions: List[AutocompleteSuggestion]
 
 
 class AutocompleteRequest(BaseModel):
     term: str
     limit: int = 10
-
-
-class AutocompleteResponse(BaseModel):
-    suggestions: List[AutocompleteSuggestion]
 
 
 class GenomicRegionSuggestion(BaseModel):
