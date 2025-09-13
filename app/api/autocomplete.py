@@ -41,7 +41,6 @@ async def unified_autocomplete(
         )
 
         for pathway_name, path_gene in pathway_results:
-            print(pathway_name, path_gene)
             suggestions.append(
                 AutocompleteSuggestion(
                     value=pathway_name, type="pathway", pathway_genes=path_gene
