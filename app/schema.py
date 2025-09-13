@@ -119,3 +119,18 @@ class TokenResponse(BaseModel):
     created_at: datetime
     description: Optional[str]
     expires_at: Optional[datetime]
+
+
+class AutocompleteSuggestion(BaseModel):
+    type: str  # "gene" or "pathway"
+    value: str
+    pathway_genes: Optional[str] = None  # Only for pathway type
+
+
+class AutocompleteRequest(BaseModel):
+    term: str
+    limit: int = 10
+
+
+class AutocompleteResponse(BaseModel):
+    suggestions: List[AutocompleteSuggestion]
