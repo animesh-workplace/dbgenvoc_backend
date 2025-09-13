@@ -5,14 +5,17 @@ from app.core import GERMLINE_TABLES
 from app.api.search import generic_search
 from app.api.aggregate import generic_aggregate
 from fastapi.middleware.cors import CORSMiddleware
+from app.api.autocomplete import unified_autocomplete
 from fastapi import FastAPI, Depends, Path, HTTPException, APIRouter
-from app.auth import verify_germline_token, TokenInfo, require_germline_access
 from app.api.concate_aggregate import generic_concatenated_aggregate
+from app.auth import verify_germline_token, TokenInfo, require_germline_access
 from app.schema import (
     SearchRequest,
     SearchResponse,
     AggregationRequest,
     AggregationResponse,
+    AutocompleteRequest,
+    AutocompleteResponse,
     ConcatenatedAggregationRequest,
 )
 
@@ -73,6 +76,15 @@ async def TABLE_AGGREGATE_CONCATE_API(
     return await generic_concatenated_aggregate(
         request=request, table_name=table_name, db=db
     )
+
+
+@api_router.post("/autocomplete", response_model=AutocompleteResponse)
+async def autocomplete_unified(
+    request: AutocompleteRequest, db: Session = Depends(get_db)
+):
+    """Unified autocomplete returning genes and pathways with pathway genes"""
+    result = await unified_autocomplete(term=request.term, limit=request.limit, db=db)
+    return AutocompleteResponse(**result)
 
 
 app = FastAPI()
