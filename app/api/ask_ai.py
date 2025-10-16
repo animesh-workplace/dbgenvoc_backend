@@ -3,10 +3,11 @@ from pydantic import ValidationError
 from fastapi import HTTPException, status
 from app.api.search import generic_search
 from app.api.aggregate import generic_aggregate
-from app.agents.search import search_agent, SearchModel
 from app.agents.orchestrator import orchestrator_agent
+from app.agents.search import search_agent, SearchModel
 from app.agents.aggregate import aggregate_agent, AggregationModel
 from app.api.concate_aggregate import generic_concatenated_aggregate
+from app.agents.synthesizer import preprocess_results_for_synthesis, synthesizer_agent
 from app.agents.concate_aggregate import (
     concate_aggregate_agent,
     ConcatenatedAggregationModel,
@@ -49,8 +50,7 @@ async def execute_api_call(
 
 async def ask_database(query: str, db):
     """
-    Query SQLite database using natural language via Bedrock.
-    Includes table context for better results.
+    Query database using the full Plan -> Execute -> Synthesize workflow.
     """
     specialists = {
         "generic_search": search_agent,
@@ -58,57 +58,85 @@ async def ask_database(query: str, db):
         "generic_concatenated_aggregate": concate_aggregate_agent,
     }
 
+    # --- 1. PLAN ---
     try:
         plan_response = orchestrator_agent.run(query)
-        # The .content attribute from agno should already be a validated Pydantic model
         plan = plan_response.content
     except (ValidationError, json.JSONDecodeError) as e:
-        # Catches cases where the orchestrator fails to produce a valid plan
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail=f"The orchestrator agent failed to generate a valid plan. Error: {str(e)}",
         )
 
+    # --- 2. EXECUTE ---
     execution_results = []
     for step in plan.plan:
         tool_name = step.tool_name
         query_context = step.query_context
 
         if tool_name not in specialists:
-            # Handle cases where the orchestrator hallucinates a tool name
-            # We can choose to log this and skip, or raise an error. Raising is safer.
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                status_code=500,
                 detail=f"Orchestrator planned an unknown tool: '{tool_name}'",
             )
 
         try:
             specialist_agent = specialists[tool_name]
             params_response = specialist_agent.run(query_context)
-            params = (
-                params_response.content
-            )  # .content already gives the Pydantic model
+            params = params_response.content
 
-            # This is the most critical call. It runs the database function
-            # which might raise an HTTPException for a bad column name.
             result = await execute_api_call(tool_name, params, db)
 
-            execution_results.append({"context": query_context, "result": result})
-
-        except ValidationError as e:
-            # This catches errors if the specialist agent produces malformed JSON
-            # that doesn't match its Pydantic output_schema.
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Specialist agent '{tool_name}' produced invalid parameters for context '{query_context}'. Error: {str(e)}",
+            # Important: Add tool_name to results for the pre-processor
+            execution_results.append(
+                {
+                    "result": result,
+                    "params": params,
+                    "tool_name": tool_name,
+                    "context": query_context,
+                }
             )
         except HTTPException as e:
-            # This catches validation errors FROM your database functions.
-            # This is where the "column does not exist" error will be caught!
-            # We add context to the original error message.
             raise HTTPException(
                 status_code=e.status_code,
                 detail=f"Error in step '{query_context}': {e.detail}",
             )
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"An unexpected error occurred during execution: {str(e)}",
+            )
 
-    return execution_results
+    # --- 3. SYNTHESIZE ---
+    if not execution_results:
+        return (
+            "I was able to create a plan, but no data was returned from the database."
+        )
+
+    # Pre-process the results to make them concise
+    summarized_data = preprocess_results_for_synthesis(execution_results)
+    print(f"Summarized Data for Synthesis:\n{json.dumps(summarized_data, indent=2)}\n")
+
+    synthesis_prompt = f"""
+        Original User Query: "{query}"
+
+        Data Results:
+        {json.dumps(summarized_data)}
+    """
+
+    try:
+        synthesis_response = synthesizer_agent.run(synthesis_prompt)
+        final_answer = synthesis_response.content
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"The synthesizer agent failed to generate a final answer. Error: {str(e)}",
+        )
+
+    return {
+        "plan": plan,
+        "answer": final_answer,
+        "data": summarized_data,
+        "results": execution_results,
+        "synthesis_prompt": synthesis_prompt,
+    }
