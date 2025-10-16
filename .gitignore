@@ -10,7 +10,11 @@ wheels/
 .venv
 
 # Database files
+/database
 *.sqlite3
 
 # Git Saver
 git.saver
+
+# Environment variables
+.env

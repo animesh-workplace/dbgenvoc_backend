@@ -6,7 +6,7 @@ from sqlalchemy import Column, Integer, BigInteger, String, Text, DateTime, Bool
 class EsJournal(Base):
     __tablename__ = "es_journal"
 
-    esj_id = Column(Integer, primary_key=True, autoincrement=True)
+    variant_id = Column(Integer, primary_key=True, autoincrement=True)
     gene = Column(String(20))
     entrez_gene_id = Column(Integer)
     ncbi_build = Column(String(6))
@@ -36,7 +36,7 @@ class EsJournal(Base):
 class EsTcga(Base):
     __tablename__ = "es_tcga"
 
-    tcga_id = Column(Integer, primary_key=True, autoincrement=True)
+    variant_id = Column(Integer, primary_key=True, autoincrement=True)
     gene = Column(String(20), index=True)
     entrez_gene_id = Column(Integer)
     ncbi_build = Column(String(6))
@@ -65,7 +65,7 @@ class EsTcga(Base):
 class ExomeGermline(Base):
     __tablename__ = "exome_germline"
 
-    egm_id = Column(Integer, primary_key=True, autoincrement=True)
+    variant_id = Column(Integer, primary_key=True, autoincrement=True)
     gene = Column(String(20), index=True)
     entrez_gene_id = Column(Integer)
     ncbi_build = Column(String(3))
@@ -96,7 +96,7 @@ class ExomeGermline(Base):
 class ExomeSomatic(Base):
     __tablename__ = "exome_somatic"
 
-    esm_id = Column(Integer, primary_key=True, autoincrement=True)
+    variant_id = Column(Integer, primary_key=True, autoincrement=True)
     gene = Column(String(20), index=True)
     entrez_gene_id = Column(Integer)
     ncbi_build = Column(String(3))
@@ -127,7 +127,7 @@ class ExomeSomatic(Base):
 class WgGermline(Base):
     __tablename__ = "wg_germline"
 
-    wgm_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    variant_id = Column(BigInteger, primary_key=True, autoincrement=True)
     gene = Column(String(20), index=True)
     entrez_gene_id = Column(Integer)
     ncbi_build = Column(String(3))
@@ -158,7 +158,7 @@ class WgGermline(Base):
 class WgSomatic(Base):
     __tablename__ = "wg_somatic"
 
-    wsm_id = Column(Integer, primary_key=True, autoincrement=True)
+    variant_id = Column(Integer, primary_key=True, autoincrement=True)
     gene = Column(String(20), index=True)
     entrez_gene_id = Column(Integer)
     ncbi_build = Column(String(3))
@@ -189,7 +189,7 @@ class WgSomatic(Base):
 class TargetedGermline(Base):
     __tablename__ = "targeted_germline"
 
-    tgm_id = Column(Integer, primary_key=True, autoincrement=True)
+    variant_id = Column(Integer, primary_key=True, autoincrement=True)
     gene = Column(String(20))
     entrez_gene_id = Column(Integer)
     ncbi_build = Column(String(3))
@@ -220,7 +220,7 @@ class TargetedGermline(Base):
 class TargetedSomatic(Base):
     __tablename__ = "targeted_somatic"
 
-    tsm_id = Column(Integer, primary_key=True, autoincrement=True)
+    variant_id = Column(Integer, primary_key=True, autoincrement=True)
     gene = Column(String(20))
     entrez_gene_id = Column(Integer)
     ncbi_build = Column(String(3))

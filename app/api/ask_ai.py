@@ -1,53 +1,62 @@
 from fastapi import HTTPException
-from sqlalchemy import create_engine
-from llama_index.core import SQLDatabase
-from llama_index.llms.ollama import Ollama
-from app.session import SQLALCHEMY_DATABASE_URL
-from llama_index.core.indices.struct_store import NLSQLTableQueryEngine
+from pydantic import BaseModel, Field
+from app.agents.search import search_agent
+from app.api.aggregate import generic_aggregate
+from app.agents.aggregate import aggregate_agent
+from app.agents.orchestrator import orchestrator_agent
+from app.api.search import generic_search, SearchRequest
+from app.agents.concate_aggregate import concate_aggregate_agent
+from app.api.concate_aggregate import generic_concatenated_aggregate
 
 
-async def ask_ollama_sql(db_path: str, query: str, model: str = "llama3.2"):
-    """
-    Query SQLite database using natural language via Ollama + LlamaIndex.
+class SearchModel(BaseModel):
+    table_name: str = Field(..., description="Name of the database table")
+    request_body: SearchRequest = Field(..., description="Search request parameters")
 
-    Args:
-        db_path (str): Path to SQLite database
-        query (str): Natural language query
-        model (str): Ollama model (default: llama3.2)
-    """
 
-    try:
-        if not query or len(query.strip()) < 5:
-            raise HTTPException(
-                status_code=400, detail="Query must be at least 5 characters long"
-            )
-
-        # ✅ Connect to SQLite (restrict only to es_somatic + ej_tcga)
-        engine = create_engine(f"{SQLALCHEMY_DATABASE_URL}?mode=ro&uri=true")
-        sql_database = SQLDatabase(
-            engine,
-            include_tables=["wg_somatic", "es_tcga"],
-            table_descriptions={
-                "wg_somatic": "Somatic mutation data from Indian oral cancer patients",
-                "es_tcga": "Somatic mutation data from TCGA oral cancer subset",
-            },
+async def execute_api_call(tool_name: str, params: SearchModel, db) -> dict:
+    if tool_name == "generic_search":
+        output = await generic_search(params.table_name, params.request_body, db)
+        print("Output from search Call", output)
+        return output
+    elif tool_name == "generic_aggregate":
+        output = await generic_aggregate(
+            table_name=params.table_name, request=params.request_body, db=db
         )
+        print("Output from aggregate Call", output)
+        return output
+    elif tool_name == "generic_concatenated_aggregate":
+        output = await generic_concatenated_aggregate(
+            table_name=params.table_name, request=params.request_body, db=db
+        )
+        print("Output from concatenated aggregate Call", output)
+        return output
 
-        # ✅ Use Ollama as the LLM
-        llm = Ollama(model=model, request_timeout=120.0)
 
-        # ✅ Create NL→SQL engine
-        query_engine = NLSQLTableQueryEngine(sql_database=sql_database, llm=llm)
+async def ask_database(query: str, db):
+    """
+    Query SQLite database using natural language via Bedrock.
+    Includes table context for better results.
+    """
+    specialists = {
+        "generic_search": search_agent,
+        "generic_aggregate": aggregate_agent,
+        "generic_concatenated_aggregate": concate_aggregate_agent,
+    }
+    plan_response = orchestrator_agent.run(query)
+    print("orchestrator_agent: ", plan_response.content)
 
-        # ✅ Run query
-        response = query_engine.query(query)
+    for step in plan_response.content.plan:
+        tool_name = step.tool_name
+        query_context = step.query_context
 
-        return {
-            "query": query,
-            "answer": str(response),  # LlamaIndex response object → string
-        }
+        if tool_name in specialists:
+            specialist_agent = specialists[tool_name]
+            params_response = specialist_agent.run(query_context)
+            params = params_response.content
+            print("\n\n", tool_name, params)
+            await execute_api_call(tool_name, params, db)
+            # result = execute_api_call(tool_name, params)
+            # execution_results.append({"context": query_context, "result": result})
 
-    except HTTPException as http_err:
-        raise http_err
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ollama SQL API failed: {str(e)}")
+    return "Query processed successfully"

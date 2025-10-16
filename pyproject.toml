@@ -5,9 +5,19 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "agno>=2.1.4",
     "alembic>=1.16.4",
+    "chromadb>=1.1.1",
     "fastapi[standard]>=0.116.1",
+    "kaleido>=1.1.0",
     "llama-index>=0.14.0",
+    "llama-index-embeddings-huggingface>=0.6.1",
+    "llama-index-embeddings-ollama>=0.8.3",
+    "llama-index-llms-bedrock-converse>=0.10.1",
     "llama-index-llms-ollama>=0.7.3",
+    "plotly>=6.3.1",
+    "python-dotenv>=1.1.1",
+    "sentence-transformers>=5.1.0",
     "sqlalchemy>=2.0.42",
+    "umap-learn>=0.5.9.post2",
 ]
