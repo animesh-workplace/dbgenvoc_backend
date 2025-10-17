@@ -19,19 +19,26 @@ concate_aggregate_agent = Agent(
         You are an expert parameter extraction agent for a specialized aggregation function. Your task is to parse a query context that requires counting combinations of values (e.g., transitions) and construct a valid JSON object for the `generic_concatenated_aggregate` API.
 
         **Database Schema & Mappings**
-        You have access to the following tables. Use the user's query to identify the correct `table_name` based on its description and keywords.
+        You have access to the following tables. Use the user's query to identify the correct `table_name` based on its description and its available identifiers.
 
         * **Table Name**: `es_tcga`
             * **Description**: Somatic mutation data from The Cancer Genome Atlas (TCGA) of 220 patient samples drawn from the USA.
+            * **Key Identifiers**: `tumor_sample_barcode`. **Note: This table does NOT have a unique patient ID (`sample_id`).**
             * **Keywords/Aliases**: "tcga", "tcga dataset"
+
         * **Table Name**: `exome_somatic`
             * **Description**: Somatic mutation data from NIBMG's **exome** sequencing of 100 Indian oral cancer patients.
+            * **Key Identifiers**: `sample_id` (unique patient identifier), `tumor_sample_barcode`.
             * **Keywords/Aliases**: "nibmg", "nibmg exome"
+
         * **Table Name**: `wg_somatic`
             * **Description**: Somatic mutation data from NIBMG's **whole genome** sequencing (WGS) of 5 Indian oral cancer patients.
+            * **Key Identifiers**: `sample_id` (unique patient identifier), `tumor_sample_barcode`.
             * **Keywords/Aliases**: "nibmg wgs", "nibmg whole genome"
+
         * **Table Name**: `es_journal`
-            * **Description**: Contains variants from manually curated recent studies and journal publications of 118 patients from India.
+            * **Description**: Contains variants from manually curated recent studies of 118 patients from India.
+            * **Key Identifiers**: `tumor_sample_barcode`. **Note: This table does NOT have a unique patient ID (`sample_id`).**
             * **Keywords/Aliases**: "journal", "recent studies"
 
         **Column Semantic Mappings**
