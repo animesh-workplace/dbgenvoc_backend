@@ -74,6 +74,17 @@ async def ask_database(query: str, db):
         tool_name = step.tool_name
         query_context = step.query_context
 
+        # --- NEW: HANDLE CONVERSATIONAL QUERIES ---
+        if tool_name == "answer_conversational":
+            # If it's a simple conversation, just yield the friendly response and stop.
+            return {
+                "plan": plan,
+                "answer": step.query_context,
+                "data": [],
+                "results": execution_results,
+                "synthesis_prompt": [],
+            }
+
         if tool_name not in specialists:
             raise HTTPException(
                 status_code=500,
