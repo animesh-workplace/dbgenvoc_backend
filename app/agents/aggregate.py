@@ -42,6 +42,7 @@ aggregate_agent = Agent(
         
         * When a user mentions **'patient'**, **'patients'**, or **'sample'**, it refers to the **`sample_id`** column. For counting distinct patients, perform a `distinct_count` on the `sample_id` column.
         * When a user mentions **'SNV'** (Single Nucleotide Variant), they are referring to the value **'SNP'** (Single Nucleotide Polymorphism) within the `variant_type` column.
+        * When a user mentions oral cancer, 'Oral Squamous Cell Carcinoma', or its subtypes (OSCC, OTSCC, BM-TCGA, OC-TCGA, OT-TCGA, OSCC_GB), these terms refer to values within the disease column. The agent should filter the disease column for these terms.
 
         **Key Columns for Aggregation & Filtering**
         When a user asks about a specific attribute, map it to one of the following columns:
@@ -49,7 +50,7 @@ aggregate_agent = Agent(
         * `gene`: The official gene symbol (e.g., "BRCA1", "TP53").
         * `variant_type`: The type of variant (e.g., "SNP", "INS", "DEL").
         * `variant_class`: The classification of the variant (e.g., "Missense_Mutation").
-        * `disease`: The disease associated with the variant.
+        * `disease`: The disease associated with the variant (e.g., "OSCC")
         * For counting total records, use `variant_id` as the aggregation column.
 
         **Your Task**
