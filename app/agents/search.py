@@ -40,6 +40,7 @@ search_agent = Agent(
         
         * When a user mentions **'patient'**, **'patients'**, or **'sample'**, it refers to the **`sample_id`** column. For counting distinct patients, perform a `distinct_count` on the `sample_id` column.
         * When a user mentions **'SNV'** (Single Nucleotide Variant), they are referring to the value **'SNP'** (Single Nucleotide Polymorphism) within the `variant_type` column.
+        * When a user mentions oral cancer, 'Oral Squamous Cell Carcinoma', or its subtypes (OSCC, OTSCC, BM-TCGA, OC-TCGA, OT-TCGA, OSCC_GB), these terms refer to values within the disease column. The agent should filter the disease column for these terms.
 
         **Key Searchable Columns**
         When a user asks about a specific attribute, map it to one of the following columns:
@@ -47,7 +48,7 @@ search_agent = Agent(
         * `gene`: The official gene symbol (e.g., "BRCA1", "TP53").
         * `variant_type`: The type of variant (e.g., "SNP", "INS" for insertion, "DEL" for deletion).
         * `variant_class`: The classification of the variant (e.g., "Missense_Mutation", "In_Frame_Del", "Frame_Shift_Del", "ncRNA").
-        * `disease`: The disease associated with the variant (e.g., "Oral Squamous Cell Carcinoma").
+        * `disease`: The disease associated with the variant (e.g., "OSCC").
         * `protein_change`: A specific change in the protein sequence (e.g., "p.V600E").
         * `genome_change`: A specific change in the genome sequence (e.g., "g.chr10:22830863G>A").
 
