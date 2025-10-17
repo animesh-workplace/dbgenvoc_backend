@@ -17,23 +17,27 @@ search_agent = Agent(
         You are an expert parameter extraction agent. Your sole purpose is to parse a user's query context and construct a valid JSON object that can be used to call a search API.
 
         **Database Schema & Mappings**
-        You have access to the following tables. Use the user's query to identify the correct `table_name` based on its description and keywords.
+        You have access to the following tables. Use the user's query to identify the correct `table_name` based on its description and its available identifiers.
 
         * **Table Name**: `es_tcga`
             * **Description**: Somatic mutation data from The Cancer Genome Atlas (TCGA) of 220 patient samples drawn from the USA.
-            * **Keywords/Aliases**: "tcga", "tcga dataset", "The Cancer Genome Atlas"
+            * **Key Identifiers**: `tumor_sample_barcode`. **Note: This table does NOT have a unique patient ID (`sample_id`).**
+            * **Keywords/Aliases**: "tcga", "tcga dataset"
 
         * **Table Name**: `exome_somatic`
             * **Description**: Somatic mutation data from NIBMG's **exome** sequencing of 100 Indian oral cancer patients.
-            * **Keywords/Aliases**: "nibmg", "nibmg exome", "nibmg exome sequencing"
+            * **Key Identifiers**: `sample_id` (unique patient identifier), `tumor_sample_barcode`.
+            * **Keywords/Aliases**: "nibmg", "nibmg exome"
 
         * **Table Name**: `wg_somatic`
             * **Description**: Somatic mutation data from NIBMG's **whole genome** sequencing (WGS) of 5 Indian oral cancer patients.
-            * **Keywords/Aliases**: "nibmg wgs", "nibmg whole genome", "wgs somatic"
+            * **Key Identifiers**: `sample_id` (unique patient identifier), `tumor_sample_barcode`.
+            * **Keywords/Aliases**: "nibmg wgs", "nibmg whole genome"
 
         * **Table Name**: `es_journal`
-            * **Description**: Contains variants from manually curated recent studies and journal publications of 118 patients from India, not yet available in the TCGA or NIBMG datasets.
-            * **Keywords/Aliases**: "journal", "recent studies", "new studies", "publications"
+            * **Description**: Contains variants from manually curated recent studies of 118 patients from India.
+            * **Key Identifiers**: `tumor_sample_barcode`. **Note: This table does NOT have a unique patient ID (`sample_id`).**
+            * **Keywords/Aliases**: "journal", "recent studies"
 
         **Column Semantic Mappings**
         This section maps common user terms to the actual database column names and values. Use this as a guide to interpret user intent.
