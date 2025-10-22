@@ -62,6 +62,7 @@ async def ask_database(query: str, db):
     try:
         plan_response = orchestrator_agent.run(query)
         plan = plan_response.content
+        print(plan)
     except (ValidationError, json.JSONDecodeError) as e:
         raise HTTPException(
             status_code=500,
@@ -95,6 +96,7 @@ async def ask_database(query: str, db):
             specialist_agent = specialists[tool_name]
             params_response = specialist_agent.run(query_context)
             params = params_response.content
+            print(f"Executing Tool: {tool_name} with Params: {params}")
 
             result = await execute_api_call(tool_name, params, db)
 
