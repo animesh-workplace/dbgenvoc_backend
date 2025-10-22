@@ -18,6 +18,7 @@ git.saver
 
 # Environment variables
 .env
+renv/
 
 # old files
 /old
