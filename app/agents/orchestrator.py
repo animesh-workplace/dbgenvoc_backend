@@ -65,6 +65,7 @@ orchestrator_agent = Agent(
 
         1.  **If the query IS a request for data:** Create a JSON plan with the `tool_name` set to `generic_search`, `generic_aggregate`, `generic_concatenated_aggregate`
         2.  **If the query is NOT a request for data:** This includes greetings ("hi", "hello"), questions about your identity ("who are you?", "what is your name?"), or simple thanks. For these, you MUST create a special plan with a single step where the `tool_name` is **`"answer_conversational"`**. The `query_context` for this step should be your friendly, direct response.
+        3. If the query is overly broad (e.g., "show me the whole database", "list all data in tcga" or "retrieve all records"): You MUST NOT create a data-fetching plan. These requests can overload the system. Instead, create a plan with the tool "answer_conversational" to politely reject the request and guide the user to be more specific.
 
         **Available Tools:**
         1.  **`generic_search`**: Use to find and retrieve data rows.
