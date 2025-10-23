@@ -291,3 +291,57 @@ class ApiToken(Base):
     last_used_at = Column(DateTime, nullable=True)
     permissions = Column(Text, nullable=True)  # JSON string of permissions
     ip_whitelist = Column(Text, nullable=True)  # JSON array of allowed IPs
+
+
+class EsTcgaOncoplot(Base):
+    __tablename__ = "es_tcga_oncoplot"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    gene = Column(String(20))
+    sample_id = Column(String(20))
+    evalue = Column(Integer)
+    annotation = Column(String(255))
+
+
+class EsJournalOncoplot(Base):
+    __tablename__ = "es_journal_oncoplot"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    gene = Column(String(20))
+    sample_id = Column(String(20))
+    evalue = Column(Integer)
+    annotation = Column(String(255))
+
+
+class ExomeGermlineOncoplot(Base):
+    __tablename__ = "exome_germline_oncoplot"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    gene = Column(String(20))
+    sample_id = Column(String(20))
+    evalue = Column(Integer)
+    annotation = Column(String(255))
+
+
+class ExomeSomaticOncoplot(Base):
+    __tablename__ = "exome_somatic_oncoplot"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    gene = Column(String(20))
+    sample_id = Column(String(20))
+    evalue = Column(Integer)
+    annotation = Column(String(255))
+
+
+class WgGermlineOncoplot(Base):
+    __tablename__ = "wg_germline_oncoplot"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    gene = Column(String(20))
+    sample_id = Column(String(20))
+    evalue = Column(Integer)
+    annotation = Column(String(255))
+
+
+class WgSomaticOncoplot(Base):
+    __tablename__ = "wg_somatic_oncoplot"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    gene = Column(String(20))
+    sample_id = Column(String(20))
+    evalue = Column(Integer)
+    annotation = Column(String(255))
