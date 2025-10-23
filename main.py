@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core import GERMLINE_TABLES
 from app.api.ask_ai import ask_database
 from app.api.search import generic_search
+from app.api.oncoplot import oncoplot_search
 from app.api.aggregate import generic_aggregate
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.autocomplete import unified_autocomplete
@@ -13,6 +14,7 @@ from app.auth import verify_germline_token, TokenInfo, require_germline_access
 from app.schema import (
     SearchRequest,
     SearchResponse,
+    OncoplotRequest,
     AggregationRequest,
     AggregationResponse,
     AutocompleteRequest,
@@ -77,6 +79,23 @@ async def TABLE_AGGREGATE_CONCATE_API(
     return await generic_concatenated_aggregate(
         request=request, table_name=table_name, db=db
     )
+
+
+@api_router.post("/{table_name}/oncoplot")
+async def TABLE_ONCOPLOT_API(
+    request: OncoplotRequest,
+    db: Session = Depends(get_db),
+    token_info: Optional[TokenInfo] = Depends(verify_germline_token),
+    table_name: str = Path(..., description="Name of the table to get oncoplot data"),
+):
+    """Oncoplot search supporting multiple gene terms."""
+    authenticated_user = require_germline_access(table_name, token_info)
+    if table_name in GERMLINE_TABLES and not authenticated_user:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied for germline tables without valid token",
+        )
+    return await oncoplot_search(request=request, table_name=table_name, db=db)
 
 
 @api_router.post("/autocomplete", response_model=AutocompleteResponse)
