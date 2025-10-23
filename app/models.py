@@ -295,6 +295,7 @@ class ApiToken(Base):
 
 class EsTcgaOncoplot(Base):
     __tablename__ = "es_tcga_oncoplot"
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     gene = Column(String(20))
     sample_id = Column(String(20))
@@ -304,6 +305,7 @@ class EsTcgaOncoplot(Base):
 
 class EsJournalOncoplot(Base):
     __tablename__ = "es_journal_oncoplot"
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     gene = Column(String(20))
     sample_id = Column(String(20))
@@ -313,6 +315,7 @@ class EsJournalOncoplot(Base):
 
 class ExomeGermlineOncoplot(Base):
     __tablename__ = "exome_germline_oncoplot"
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     gene = Column(String(20))
     sample_id = Column(String(20))
@@ -322,6 +325,7 @@ class ExomeGermlineOncoplot(Base):
 
 class ExomeSomaticOncoplot(Base):
     __tablename__ = "exome_somatic_oncoplot"
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     gene = Column(String(20))
     sample_id = Column(String(20))
@@ -331,6 +335,7 @@ class ExomeSomaticOncoplot(Base):
 
 class WgGermlineOncoplot(Base):
     __tablename__ = "wg_germline_oncoplot"
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     gene = Column(String(20))
     sample_id = Column(String(20))
@@ -340,6 +345,7 @@ class WgGermlineOncoplot(Base):
 
 class WgSomaticOncoplot(Base):
     __tablename__ = "wg_somatic_oncoplot"
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     gene = Column(String(20))
     sample_id = Column(String(20))
