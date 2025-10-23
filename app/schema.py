@@ -162,3 +162,13 @@ class GenomicRegionResponse(BaseModel):
 class GenomicRegionRequest(BaseModel):
     term: str
     limit: int = 10
+
+
+class OncoplotRequest(BaseModel):
+    genes: Optional[List[str]]
+
+
+class OncoplotResponse(BaseModel):
+    yAxis: List[str]
+    xAxis: List[str]
+    heatmap: List[List[Union[int, float]]]
