@@ -9,6 +9,7 @@ from app.models import (
     WgGermline,
     ExomeSomatic,
     ExomeGermline,
+    EsTcgaOncoplot,
     TargetedSomatic,
     TargetedGermline,
     ExomeSomaticOncoplot,
@@ -31,6 +32,7 @@ TABLE_REGISTRY = {
     "targeted_somatic": TargetedSomatic,
     "targeted_germline": TargetedGermline,
     "exome_somatic_oncoplot": ExomeSomaticOncoplot,
+    "es_tcga_oncoplot": EsTcgaOncoplot,
 }
 
 # Define searchable columns for each table type
