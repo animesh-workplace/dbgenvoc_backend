@@ -1,6 +1,16 @@
 from app.session import Base
 from sqlalchemy.sql import func
-from sqlalchemy import Column, Integer, BigInteger, String, Text, DateTime, Boolean
+from sqlalchemy import (
+    Column,
+    Integer,
+    BigInteger,
+    String,
+    Text,
+    DateTime,
+    Boolean,
+    Float,
+    Index,
+)
 
 
 class EsJournal(Base):
@@ -77,8 +87,8 @@ class ExomeGermline(Base):
     ref_allele = Column(String(50))
     tumor_seq_allele2 = Column(String(50))
     dbsnp_rs = Column(String(200))
-    tumor_sample_barcode = Column(String(10))
-    sample_id = Column(String(20), index=True)
+    tumor_sample_barcode = Column(String(10), index=True)
+    sample_id = Column(String(20))
     genome_change = Column(String(75))
     annotation_transcript = Column(String(20))
     transcript_strand = Column(String(2))
@@ -108,8 +118,8 @@ class ExomeSomatic(Base):
     ref_allele = Column(String(50))
     tumor_seq_allele2 = Column(String(50))
     dbsnp_rs = Column(String(200))
-    tumor_sample_barcode = Column(String(10))
-    sample_id = Column(String(20), index=True)
+    tumor_sample_barcode = Column(String(10), index=True)
+    sample_id = Column(String(20))
     genome_change = Column(String(75))
     annotation_transcript = Column(String(20))
     transcript_strand = Column(String(2))
@@ -139,8 +149,8 @@ class WgGermline(Base):
     ref_allele = Column(String(50))
     tumor_seq_allele2 = Column(String(50))
     dbsnp_rs = Column(String(200))
-    tumor_sample_barcode = Column(String(10))
-    sample_id = Column(String(20), index=True)
+    tumor_sample_barcode = Column(String(10), index=True)
+    sample_id = Column(String(20))
     genome_change = Column(String(75))
     annotation_transcript = Column(String(20))
     transcript_strand = Column(String(2))
@@ -170,8 +180,8 @@ class WgSomatic(Base):
     ref_allele = Column(String(50))
     tumor_seq_allele2 = Column(String(50))
     dbsnp_rs = Column(String(200))
-    tumor_sample_barcode = Column(String(10))
-    sample_id = Column(String(20), index=True)
+    tumor_sample_barcode = Column(String(10), index=True)
+    sample_id = Column(String(20))
     genome_change = Column(String(75))
     annotation_transcript = Column(String(20))
     transcript_strand = Column(String(2))
@@ -190,18 +200,18 @@ class TargetedGermline(Base):
     __tablename__ = "targeted_germline"
 
     variant_id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20))
+    gene = Column(String(20), index=True)
     entrez_gene_id = Column(Integer)
     ncbi_build = Column(String(3))
-    chrom = Column(String(6))
-    start = Column(String(30))
-    end = Column(String(30))
+    chrom = Column(String(6), index=True)
+    start = Column(String(30), index=True)
+    end = Column(String(30), index=True)
     variant_class = Column(String(100))
     variant_type = Column(String(10))
     ref_allele = Column(String(50))
     tumor_seq_allele2 = Column(String(50))
     dbsnp_rs = Column(String(200))
-    tumor_sample_barcode = Column(String(10))
+    tumor_sample_barcode = Column(String(10), index=True)
     sample_id = Column(String(20))
     genome_change = Column(String(75))
     annotation_transcript = Column(String(20))
@@ -221,18 +231,18 @@ class TargetedSomatic(Base):
     __tablename__ = "targeted_somatic"
 
     variant_id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20))
+    gene = Column(String(20), index=True)
     entrez_gene_id = Column(Integer)
     ncbi_build = Column(String(3))
-    chrom = Column(String(6))
-    start = Column(String(30))
-    end = Column(String(30))
+    chrom = Column(String(6), index=True)
+    start = Column(String(30), index=True)
+    end = Column(String(30), index=True)
     variant_class = Column(String(100))
     variant_type = Column(String(10))
     ref_allele = Column(String(50))
     tumor_seq_allele2 = Column(String(50))
     dbsnp_rs = Column(String(200))
-    tumor_sample_barcode = Column(String(10))
+    tumor_sample_barcode = Column(String(10), index=True)
     sample_id = Column(String(20))
     genome_change = Column(String(75))
     annotation_transcript = Column(String(20))
@@ -297,7 +307,7 @@ class EsTcgaOncoplot(Base):
     __tablename__ = "es_tcga_oncoplot"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20))
+    gene = Column(String(20), index=True)
     sample_id = Column(String(20))
     evalue = Column(Integer)
     annotation = Column(String(255))
@@ -307,7 +317,7 @@ class EsJournalOncoplot(Base):
     __tablename__ = "es_journal_oncoplot"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20))
+    gene = Column(String(20), index=True)
     sample_id = Column(String(20))
     evalue = Column(Integer)
     annotation = Column(String(255))
@@ -317,7 +327,7 @@ class ExomeGermlineOncoplot(Base):
     __tablename__ = "exome_germline_oncoplot"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20))
+    gene = Column(String(20), index=True)
     sample_id = Column(String(20))
     evalue = Column(Integer)
     annotation = Column(String(255))
@@ -327,7 +337,7 @@ class ExomeSomaticOncoplot(Base):
     __tablename__ = "exome_somatic_oncoplot"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20))
+    gene = Column(String(20), index=True)
     sample_id = Column(String(20))
     evalue = Column(Integer)
     annotation = Column(String(255))
@@ -337,7 +347,7 @@ class WgGermlineOncoplot(Base):
     __tablename__ = "wg_germline_oncoplot"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20))
+    gene = Column(String(20), index=True)
     sample_id = Column(String(20))
     evalue = Column(Integer)
     annotation = Column(String(255))
@@ -347,7 +357,93 @@ class WgSomaticOncoplot(Base):
     __tablename__ = "wg_somatic_oncoplot"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20))
+    gene = Column(String(20), index=True)
     sample_id = Column(String(20))
     evalue = Column(Integer)
     annotation = Column(String(255))
+
+
+class EsTcgaSomaticVariation(Base):
+    __tablename__ = "es_tcga_somatic_variation"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    gene1 = Column(String(20))
+    gene2 = Column(String(20))
+    p_value = Column(Float)
+    odds_ratio = Column(Float)
+    neg_log10_pval = Column(Float)
+
+    __table_args__ = (
+        Index("ix_es_tcga_somatic_variation_gene1_gene2", "gene1", "gene2"),
+    )
+
+
+class EsJournalSomaticVariation(Base):
+    __tablename__ = "es_journal_somatic_variation"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    gene1 = Column(String(20))
+    gene2 = Column(String(20))
+    p_value = Column(Float)
+    odds_ratio = Column(Float)
+    neg_log10_pval = Column(Float)
+
+    __table_args__ = (
+        Index("ix_es_journal_somatic_variation_gene1_gene2", "gene1", "gene2"),
+    )
+
+
+class ExomeSomaticVariation(Base):
+    __tablename__ = "exome_somatic_variation"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    gene1 = Column(String(20))
+    gene2 = Column(String(20))
+    p_value = Column(Float)
+    odds_ratio = Column(Float)
+    neg_log10_pval = Column(Float)
+
+    __table_args__ = (
+        Index("ix_exome_somatic_variation_gene1_gene2", "gene1", "gene2"),
+    )
+
+
+class ExomeGermlineVariation(Base):
+    __tablename__ = "exome_germline_variation"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    gene1 = Column(String(20))
+    gene2 = Column(String(20))
+    p_value = Column(Float)
+    odds_ratio = Column(Float)
+    neg_log10_pval = Column(Float)
+
+    __table_args__ = (
+        Index("ix_exome_germline_variation_gene1_gene2", "gene1", "gene2"),
+    )
+
+
+class WgSomaticVariation(Base):
+    __tablename__ = "wg_somatic_variation"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    gene1 = Column(String(20))
+    gene2 = Column(String(20))
+    p_value = Column(Float)
+    odds_ratio = Column(Float)
+    neg_log10_pval = Column(Float)
+
+    __table_args__ = (Index("ix_wg_somatic_variation_gene1_gene2", "gene1", "gene2"),)
+
+
+class WgGermlineVariation(Base):
+    __tablename__ = "wg_germline_variation"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    gene1 = Column(String(20))
+    gene2 = Column(String(20))
+    p_value = Column(Float)
+    odds_ratio = Column(Float)
+    neg_log10_pval = Column(Float)
+
+    __table_args__ = (Index("ix_wg_germline_variation_gene1_gene2", "gene1", "gene2"),)
