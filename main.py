@@ -7,6 +7,7 @@ from app.api.search import generic_search
 from app.api.oncoplot import oncoplot_search
 from app.api.aggregate import generic_aggregate
 from fastapi.middleware.cors import CORSMiddleware
+from app.api.interactions import interaction_search
 from app.api.autocomplete import unified_autocomplete
 from app.api.concate_aggregate import generic_concatenated_aggregate
 from fastapi import FastAPI, Depends, Path, HTTPException, APIRouter, Query
@@ -96,6 +97,25 @@ async def TABLE_ONCOPLOT_API(
             detail="Access denied for germline tables without valid token",
         )
     return await oncoplot_search(request=request, table_name=table_name, db=db)
+
+
+@api_router.post("/{table_name}/interactions")
+async def TABLE_INTERACTION_API(
+    request: OncoplotRequest,
+    db: Session = Depends(get_db),
+    token_info: Optional[TokenInfo] = Depends(verify_germline_token),
+    table_name: str = Path(
+        ..., description="Name of the table to get interaction data"
+    ),
+):
+    """Oncoplot search supporting multiple gene terms."""
+    authenticated_user = require_germline_access(table_name, token_info)
+    if table_name in GERMLINE_TABLES and not authenticated_user:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied for germline tables without valid token",
+        )
+    return await interaction_search(request=request, table_name=table_name, db=db)
 
 
 @api_router.post("/autocomplete", response_model=AutocompleteResponse)
