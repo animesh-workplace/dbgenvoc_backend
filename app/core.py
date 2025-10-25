@@ -14,6 +14,7 @@ from app.models import (
     TargetedGermline,
     WgSomaticOncoplot,
     ExomeSomaticOncoplot,
+    EsTcgaSomaticVariation,
 )
 from fastapi import HTTPException
 from typing import List, Dict, Any
@@ -35,6 +36,7 @@ TABLE_REGISTRY = {
     "targeted_germline": TargetedGermline,
     "wg_somatic_oncoplot": WgSomaticOncoplot,
     "exome_somatic_oncoplot": ExomeSomaticOncoplot,
+    "es_tcga_somatic_variation": EsTcgaSomaticVariation,
 }
 
 # Define searchable columns for each table type
