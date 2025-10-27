@@ -1,449 +1,195 @@
+from sqlalchemy import (
+    Text,
+    Index,
+    String,
+    Column,
+    Boolean,
+    Integer,
+    DateTime,
+)
+from app.abstract import (
+    BaseVariantModel,
+    BaseOncoplotModel,
+    BaseSampleTMBModel,
+    BaseSampleTiTvModel,
+    BaseGeneInteractionModel,
+)
 from app.session import Base
 from sqlalchemy.sql import func
-from sqlalchemy import (
-    Column,
-    Integer,
-    BigInteger,
-    String,
-    Text,
-    DateTime,
-    Boolean,
-    Float,
-    Index,
-)
-
-
-class EsJournal(Base):
-    __tablename__ = "es_journal"
-
-    variant_id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20))
-    entrez_gene_id = Column(Integer)
-    ncbi_build = Column(String(6))
-    chrom = Column(String(6), index=True)
-    start = Column(String(30), index=True)
-    end = Column(String(30), index=True)
-    variant_class = Column(String(100))
-    variant_type = Column(String(10))
-    ref_allele = Column(String(50))
-    tumor_seq_allele2 = Column(String(50))
-    dbsnp_rs = Column(String(200))
-    tumor_sample_barcode = Column(String(20), index=True)
-    genome_change = Column(String(75))
-    annotation_transcript = Column(String(20))
-    transcript_strand = Column(String(2))
-    transcript_exon = Column(String(10))
-    transcript_position = Column(String(20))
-    cDNA_change = Column(String(30))
-    codon_change = Column(String(30))
-    protein_change = Column(String(20))
-    disease = Column(String(100))
-    reference_url = Column(String(900))
-    reference = Column(String(200))
-    remarks = Column(String(500))
-
-
-class EsTcga(Base):
-    __tablename__ = "es_tcga"
-
-    variant_id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20), index=True)
-    entrez_gene_id = Column(Integer)
-    ncbi_build = Column(String(6))
-    chrom = Column(String(6), index=True)
-    start = Column(String(30), index=True)
-    end = Column(String(30), index=True)
-    variant_class = Column(String(100))
-    variant_type = Column(String(10))
-    ref_allele = Column(String(50))
-    tumor_seq_allele2 = Column(String(50))
-    dbsnp_rs = Column(String(200))
-    tumor_sample_barcode = Column(String(20), index=True)
-    genome_change = Column(String(75))
-    annotation_transcript = Column(String(20))
-    transcript_strand = Column(String(2))
-    transcript_exon = Column(String(10))
-    transcript_position = Column(String(20))
-    cDNA_change = Column(String(30))
-    codon_change = Column(String(30))
-    protein_change = Column(String(20))
-    disease = Column(String(100))
-    reference_url = Column(String(900))
-    reference = Column(String(200))
-
-
-class ExomeGermline(Base):
-    __tablename__ = "exome_germline"
-
-    variant_id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20), index=True)
-    entrez_gene_id = Column(Integer)
-    ncbi_build = Column(String(3))
-    chrom = Column(String(6), index=True)
-    start = Column(String(30), index=True)
-    end = Column(String(30), index=True)
-    variant_class = Column(String(100))
-    variant_type = Column(String(10))
-    ref_allele = Column(String(50))
-    tumor_seq_allele2 = Column(String(50))
-    dbsnp_rs = Column(String(200))
-    tumor_sample_barcode = Column(String(10), index=True)
-    sample_id = Column(String(20))
-    genome_change = Column(String(75))
-    annotation_transcript = Column(String(20))
-    transcript_strand = Column(String(2))
-    transcript_exon = Column(String(10))
-    transcript_position = Column(String(20))
-    cDNA_change = Column(String(30))
-    codon_change = Column(String(30))
-    protein_change = Column(String(20))
-    disease = Column(String(100))
-    reference_url = Column(String(900))
-    reference = Column(String(200))
-    remarks = Column(String(500))
-
-
-class ExomeSomatic(Base):
-    __tablename__ = "exome_somatic"
-
-    variant_id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20), index=True)
-    entrez_gene_id = Column(Integer)
-    ncbi_build = Column(String(3))
-    chrom = Column(String(6), index=True)
-    start = Column(String(30), index=True)
-    end = Column(String(30), index=True)
-    variant_class = Column(String(100))
-    variant_type = Column(String(10))
-    ref_allele = Column(String(50))
-    tumor_seq_allele2 = Column(String(50))
-    dbsnp_rs = Column(String(200))
-    tumor_sample_barcode = Column(String(10), index=True)
-    sample_id = Column(String(20))
-    genome_change = Column(String(75))
-    annotation_transcript = Column(String(20))
-    transcript_strand = Column(String(2))
-    transcript_exon = Column(String(10))
-    transcript_position = Column(String(20))
-    cDNA_change = Column(String(30))
-    codon_change = Column(String(30))
-    protein_change = Column(String(20))
-    disease = Column(String(100))
-    reference_url = Column(String(900))
-    reference = Column(String(200))
-    remarks = Column(String(500))
-
-
-class WgGermline(Base):
-    __tablename__ = "wg_germline"
-
-    variant_id = Column(BigInteger, primary_key=True, autoincrement=True)
-    gene = Column(String(20), index=True)
-    entrez_gene_id = Column(Integer)
-    ncbi_build = Column(String(3))
-    chrom = Column(String(6), index=True)
-    start = Column(String(30), index=True)
-    end = Column(String(30), index=True)
-    variant_class = Column(String(100))
-    variant_type = Column(String(10))
-    ref_allele = Column(String(50))
-    tumor_seq_allele2 = Column(String(50))
-    dbsnp_rs = Column(String(200))
-    tumor_sample_barcode = Column(String(10), index=True)
-    sample_id = Column(String(20))
-    genome_change = Column(String(75))
-    annotation_transcript = Column(String(20))
-    transcript_strand = Column(String(2))
-    transcript_exon = Column(String(10))
-    transcript_position = Column(String(20))
-    cDNA_change = Column(String(30))
-    codon_change = Column(String(30))
-    protein_change = Column(String(20))
-    disease = Column(String(100))
-    reference_url = Column(String(900))
-    reference = Column(String(200))
-    remarks = Column(String(500))
-
-
-class WgSomatic(Base):
-    __tablename__ = "wg_somatic"
-
-    variant_id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20), index=True)
-    entrez_gene_id = Column(Integer)
-    ncbi_build = Column(String(3))
-    chrom = Column(String(6), index=True)
-    start = Column(String(30), index=True)
-    end = Column(String(30), index=True)
-    variant_class = Column(String(100))
-    variant_type = Column(String(10))
-    ref_allele = Column(String(50))
-    tumor_seq_allele2 = Column(String(50))
-    dbsnp_rs = Column(String(200))
-    tumor_sample_barcode = Column(String(10), index=True)
-    sample_id = Column(String(20))
-    genome_change = Column(String(75))
-    annotation_transcript = Column(String(20))
-    transcript_strand = Column(String(2))
-    transcript_exon = Column(String(10))
-    transcript_position = Column(String(20))
-    cDNA_change = Column(String(30))
-    codon_change = Column(String(30))
-    protein_change = Column(String(20))
-    disease = Column(String(100))
-    reference_url = Column(String(900))
-    reference = Column(String(200))
-    remarks = Column(String(500))
-
-
-class TargetedGermline(Base):
-    __tablename__ = "targeted_germline"
-
-    variant_id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20), index=True)
-    entrez_gene_id = Column(Integer)
-    ncbi_build = Column(String(3))
-    chrom = Column(String(6), index=True)
-    start = Column(String(30), index=True)
-    end = Column(String(30), index=True)
-    variant_class = Column(String(100))
-    variant_type = Column(String(10))
-    ref_allele = Column(String(50))
-    tumor_seq_allele2 = Column(String(50))
-    dbsnp_rs = Column(String(200))
-    tumor_sample_barcode = Column(String(10), index=True)
-    sample_id = Column(String(20))
-    genome_change = Column(String(75))
-    annotation_transcript = Column(String(20))
-    transcript_strand = Column(String(2))
-    transcript_exon = Column(String(10))
-    transcript_position = Column(String(20))
-    cDNA_change = Column(String(30))
-    codon_change = Column(String(30))
-    protein_change = Column(String(20))
-    disease = Column(String(100))
-    reference_url = Column(String(900))
-    reference = Column(String(200))
-    remarks = Column(String(500))
-
-
-class TargetedSomatic(Base):
-    __tablename__ = "targeted_somatic"
-
-    variant_id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20), index=True)
-    entrez_gene_id = Column(Integer)
-    ncbi_build = Column(String(3))
-    chrom = Column(String(6), index=True)
-    start = Column(String(30), index=True)
-    end = Column(String(30), index=True)
-    variant_class = Column(String(100))
-    variant_type = Column(String(10))
-    ref_allele = Column(String(50))
-    tumor_seq_allele2 = Column(String(50))
-    dbsnp_rs = Column(String(200))
-    tumor_sample_barcode = Column(String(10), index=True)
-    sample_id = Column(String(20))
-    genome_change = Column(String(75))
-    annotation_transcript = Column(String(20))
-    transcript_strand = Column(String(2))
-    transcript_exon = Column(String(10))
-    transcript_position = Column(String(20))
-    cDNA_change = Column(String(30))
-    codon_change = Column(String(30))
-    protein_change = Column(String(20))
-    disease = Column(String(100))
-    reference_url = Column(String(900))
-    reference = Column(String(200))
-    remarks = Column(String(500))
-
-
-class Pathway(Base):
-    __tablename__ = "pathway"
-
-    path_id = Column(String(12), primary_key=True)
-    pathway_name = Column(String(300))
-    path_gene = Column(String(6000))
-    disease = Column(String(100))
-
-
-class Genelist(Base):
-    __tablename__ = "genelist"
-
-    gene = Column(String(200), primary_key=True)
-
-
-class Samplelist(Base):
-    __tablename__ = "samplelist"
-
-    sample_id = Column(String(200), primary_key=True)
-
-
-class Uniprot(Base):
-    __tablename__ = "uniprot_fixed"
-
-    Row_Index = Column(Integer, primary_key=True, autoincrement=True)
-    Hugo_Symbol = Column(String(20))
-    Accession_Id = Column(String(20))
-    Structure = Column(Text)
 
 
 class ApiToken(Base):
     __tablename__ = "api_tokens"
 
-    token_id = Column(Integer, primary_key=True, autoincrement=True)
-    token = Column(String(255), unique=True, index=True, nullable=False)
-    user_identifier = Column(String(100), nullable=False)
-    description = Column(String(500), nullable=True)  # Purpose of token
-    is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=func.now(), nullable=False)
-    expires_at = Column(DateTime, nullable=True)  # NULL means no expiration
     last_used_at = Column(DateTime, nullable=True)
+    user_identifier = Column(String(100), nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    token_id = Column(Integer, primary_key=True, autoincrement=True)
+    created_at = Column(DateTime, default=func.now(), nullable=False)
+    token = Column(String(255), unique=True, index=True, nullable=False)
+    description = Column(String(500), nullable=True)  # Purpose of token
     permissions = Column(Text, nullable=True)  # JSON string of permissions
     ip_whitelist = Column(Text, nullable=True)  # JSON array of allowed IPs
+    expires_at = Column(DateTime, nullable=True)  # NULL means no expiration
 
 
-class EsTcgaOncoplot(Base):
-    __tablename__ = "es_tcga_oncoplot"
+# Section for Journal Models
+class JournalExomeSomaticVariant(BaseVariantModel):
+    __tablename__ = "journal_exome_somatic_variants"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20), index=True)
-    sample_id = Column(String(20))
-    evalue = Column(Integer)
-    annotation = Column(String(255))
+    remarks = Column(String(500))
 
 
-class EsJournalOncoplot(Base):
-    __tablename__ = "es_journal_oncoplot"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20), index=True)
-    sample_id = Column(String(20))
-    evalue = Column(Integer)
-    annotation = Column(String(255))
+class JournalExomeSomaticVariantOncoplot(BaseOncoplotModel):
+    __tablename__ = "journal_exome_somatic_variant_oncoplot"
 
 
-class ExomeGermlineOncoplot(Base):
-    __tablename__ = "exome_germline_oncoplot"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20), index=True)
-    sample_id = Column(String(20))
-    evalue = Column(Integer)
-    annotation = Column(String(255))
-
-
-class ExomeSomaticOncoplot(Base):
-    __tablename__ = "exome_somatic_oncoplot"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20), index=True)
-    sample_id = Column(String(20))
-    evalue = Column(Integer)
-    annotation = Column(String(255))
-
-
-class WgGermlineOncoplot(Base):
-    __tablename__ = "wg_germline_oncoplot"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20), index=True)
-    sample_id = Column(String(20))
-    evalue = Column(Integer)
-    annotation = Column(String(255))
-
-
-class WgSomaticOncoplot(Base):
-    __tablename__ = "wg_somatic_oncoplot"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    gene = Column(String(20), index=True)
-    sample_id = Column(String(20))
-    evalue = Column(Integer)
-    annotation = Column(String(255))
-
-
-class EsTcgaSomaticVariation(Base):
-    __tablename__ = "es_tcga_somatic_variation"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    gene1 = Column(String(20))
-    gene2 = Column(String(20))
-    p_value = Column(Float)
-    odds_ratio = Column(Float)
-    neg_log10_pval = Column(Float)
+class JournalExomeSomaticGeneInteraction(BaseGeneInteractionModel):
+    __tablename__ = "journal_exome_somatic_gene_interaction"
 
     __table_args__ = (
-        Index("ix_es_tcga_somatic_variation_gene1_gene2", "gene1", "gene2"),
+        Index("index_journal_exome_somatic_gene_interation", "gene1", "gene2"),
     )
 
 
-class EsJournalSomaticVariation(Base):
-    __tablename__ = "es_journal_somatic_variation"
+class JournalExomeSomaticSampleTMB(BaseSampleTMBModel):
+    __tablename__ = "journal_exome_somatic_sample_tmb"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    gene1 = Column(String(20))
-    gene2 = Column(String(20))
-    p_value = Column(Float)
-    odds_ratio = Column(Float)
-    neg_log10_pval = Column(Float)
+
+class JournalExomeSomaticSampleTiTv(BaseSampleTiTvModel):
+    __tablename__ = "journal_exome_somatic_sample_titv"
+
+
+# Section for TCGA Models
+class TCGAExomeSomaticVariant(BaseVariantModel):
+    __tablename__ = "tcga_exome_somatic_variants"
+
+    remarks = Column(String(500))
+
+
+class TCGAExomeSomaticVariantOncoplot(BaseOncoplotModel):
+    __tablename__ = "tcga_exome_somatic_variant_oncoplot"
+
+
+class TCGAExomeSomaticGeneInteraction(BaseGeneInteractionModel):
+    __tablename__ = "tcga_exome_somatic_gene_interaction"
 
     __table_args__ = (
-        Index("ix_es_journal_somatic_variation_gene1_gene2", "gene1", "gene2"),
+        Index("index_tcga_exome_somatic_gene_interation", "gene1", "gene2"),
     )
 
 
-class ExomeSomaticVariation(Base):
-    __tablename__ = "exome_somatic_variation"
+class TCGAExomeSomaticSampleTMB(BaseSampleTMBModel):
+    __tablename__ = "tcga_exome_somatic_sample_tmb"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    gene1 = Column(String(20))
-    gene2 = Column(String(20))
-    p_value = Column(Float)
-    odds_ratio = Column(Float)
-    neg_log10_pval = Column(Float)
+
+class TCGAExomeSomaticSampleTiTv(BaseSampleTiTvModel):
+    __tablename__ = "tcga_exome_somatic_sample_titv"
+
+
+# Section for NIBMG Exome Somatic Tables
+class NIBMGExomeSomaticVariant(BaseVariantModel):
+    __tablename__ = "nibmg_exome_somatic_variants"
+
+    remarks = Column(String(500))
+
+
+class NIBMGExomeSomaticVariantOncoplot(BaseOncoplotModel):
+    __tablename__ = "nibmg_exome_somatic_variant_oncoplot"
+
+
+class NIBMGExomeSomaticGeneInteraction(BaseGeneInteractionModel):
+    __tablename__ = "nibmg_exome_somatic_gene_interaction"
 
     __table_args__ = (
-        Index("ix_exome_somatic_variation_gene1_gene2", "gene1", "gene2"),
+        Index("index_nibmg_exome_somatic_gene_interation", "gene1", "gene2"),
     )
 
 
-class ExomeGermlineVariation(Base):
-    __tablename__ = "exome_germline_variation"
+class NIBMGExomeSomaticSampleTMB(BaseSampleTMBModel):
+    __tablename__ = "nibmg_exome_somatic_sample_tmb"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    gene1 = Column(String(20))
-    gene2 = Column(String(20))
-    p_value = Column(Float)
-    odds_ratio = Column(Float)
-    neg_log10_pval = Column(Float)
+
+class NIBMGExomeSomaticSampleTiTv(BaseSampleTiTvModel):
+    __tablename__ = "nibmg_exome_somatic_sample_titv"
+
+
+# Section for NIBMG Whole Genome Somatic Tables
+class NIBMGWgSomaticVariant(BaseVariantModel):
+    __tablename__ = "nibmg_wg_somatic_variants"
+
+    remarks = Column(String(500))
+
+
+class NIBMGWgSomaticVariantOncoplot(BaseOncoplotModel):
+    __tablename__ = "nibmg_wg_somatic_variant_oncoplot"
+
+
+class NIBMGWgSomaticGeneInteraction(BaseGeneInteractionModel):
+    __tablename__ = "nibmg_wg_somatic_gene_interaction"
 
     __table_args__ = (
-        Index("ix_exome_germline_variation_gene1_gene2", "gene1", "gene2"),
+        Index("index_nibmg_wg_somatic_gene_interation", "gene1", "gene2"),
     )
 
 
-class WgSomaticVariation(Base):
-    __tablename__ = "wg_somatic_variation"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    gene1 = Column(String(20))
-    gene2 = Column(String(20))
-    p_value = Column(Float)
-    odds_ratio = Column(Float)
-    neg_log10_pval = Column(Float)
-
-    __table_args__ = (Index("ix_wg_somatic_variation_gene1_gene2", "gene1", "gene2"),)
+class NIBMGWgSomaticSampleTMB(BaseSampleTMBModel):
+    __tablename__ = "nibmg_wg_somatic_sample_tmb"
 
 
-class WgGermlineVariation(Base):
-    __tablename__ = "wg_germline_variation"
+class NIBMGWgSomaticSampleTiTv(BaseSampleTiTvModel):
+    __tablename__ = "nibmg_wg_somatic_sample_titv"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    gene1 = Column(String(20))
-    gene2 = Column(String(20))
-    p_value = Column(Float)
-    odds_ratio = Column(Float)
-    neg_log10_pval = Column(Float)
 
-    __table_args__ = (Index("ix_wg_germline_variation_gene1_gene2", "gene1", "gene2"),)
+# Section for NIBMG Exome Germline Tables
+class NIBMGExomeGermlineVariant(BaseVariantModel):
+    __tablename__ = "nibmg_exome_germline_variants"
+
+    remarks = Column(String(500))
+
+
+class NIBMGExomeGermlineVariantOncoplot(BaseOncoplotModel):
+    __tablename__ = "nibmg_exome_germline_variant_oncoplot"
+
+
+class NIBMGExomeGermlineGeneInteraction(BaseGeneInteractionModel):
+    __tablename__ = "nibmg_exome_germline_gene_interaction"
+
+    __table_args__ = (
+        Index("index_nibmg_exome_germline_gene_interation", "gene1", "gene2"),
+    )
+
+
+class NIBMGExomeGermlineSampleTMB(BaseSampleTMBModel):
+    __tablename__ = "nibmg_exome_germline_sample_tmb"
+
+
+class NIBMGExomeGermlineSampleTiTv(BaseSampleTiTvModel):
+    __tablename__ = "nibmg_exome_germline_sample_titv"
+
+
+# Section for NIBMG Whole Genome Germline Tables
+class NIBMGWgGermlineVariant(BaseVariantModel):
+    __tablename__ = "nibmg_wg_germline_variants"
+
+    remarks = Column(String(500))
+
+
+class NIBMGWgGermlineVariantOncoplot(BaseOncoplotModel):
+    __tablename__ = "nibmg_wg_germline_variant_oncoplot"
+
+
+class NIBMGWgGermlineGeneInteraction(BaseGeneInteractionModel):
+    __tablename__ = "nibmg_wg_germline_gene_interaction"
+
+    __table_args__ = (
+        Index("index_nibmg_wg_germline_gene_interation", "gene1", "gene2"),
+    )
+
+
+class NIBMGWgGermlineSampleTMB(BaseSampleTMBModel):
+    __tablename__ = "nibmg_wg_germline_sample_tmb"
+
+
+class NIBMGWgGermlineSampleTiTv(BaseSampleTiTvModel):
+    __tablename__ = "nibmg_wg_germline_sample_titv"
