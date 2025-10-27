@@ -174,3 +174,9 @@ class OncoplotResponse(BaseModel):
     heatmap: List[List[Union[int, float]]]
     tmb_bar_plot: List[Dict[str, Union[str, List[Union[int, float]]]]]
     sample_bar_plot: List[Dict[str, Union[str, List[Union[int, float]]]]]
+
+
+class InteractionResponse(BaseModel):
+    yAxis: List[str]
+    xAxis: List[str]
+    heatmap: List[List[Union[str, int, float]]]
