@@ -68,11 +68,32 @@ generate_oncoplot_matrix <- function(table_name, maf_df) {
 
   # Check if specified genes are in the MAF
   available_genes <- unique(maf_obj@gene.summary$Hugo_Symbol)
-  write.table(available_genes, paste0(table_name, "_available_genes.tsv"),
+  titv_data = titv(maf=maf_obj)
+  write.table(titv_data$fraction.contribution, paste0(table_name, '_fraction_contribution.tsv'),    
     sep = "\t",
     quote = FALSE,
-    col.names = FALSE
+    col.names = TRUE
   )
+  write.table(titv_data$raw.counts, paste0(table_name, '_raw_counts.tsv'),    
+    sep = "\t",
+    quote = FALSE,
+    col.names = TRUE
+  ) 
+  write.table(titv_data$TiTv.fractions, paste0(table_name, '_titv_fractions.tsv'),    
+    sep = "\t",
+    quote = FALSE,
+    col.names = TRUE
+  ) 
+  # write.table(maf_obj@variant.classification.summary, paste0(table_name, '_tmb.tsv'),    
+  #   sep = "\t",
+  #   quote = FALSE,
+  #   col.names = TRUE
+  # )
+  # write.table(available_genes, paste0(table_name, "_available_genes.tsv"),
+  #   sep = "\t",
+  #   quote = FALSE,
+  #   col.names = FALSE
+  # )
   if (length(available_genes) == 0) {
     stop("None of the specified genes found in the MAF data")
   }
