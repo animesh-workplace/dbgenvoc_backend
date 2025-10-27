@@ -1,3 +1,4 @@
+import numpy as np
 from app.models import (
     EsTcga,
     Pathway,
@@ -18,6 +19,7 @@ from app.models import (
 )
 from fastapi import HTTPException
 from typing import List, Dict, Any
+from sqlalchemy.sql.sqltypes import Numeric, Float, Integer, DECIMAL
 
 # Table registry mapping table names to models
 TABLE_REGISTRY = {
@@ -147,5 +149,30 @@ def validate_columns(model_class, column_names: List[str]) -> List[str]:
 
 
 def row_to_dict(row) -> Dict[str, Any]:
-    """Convert SQLAlchemy row to dictionary."""
-    return {column.name: getattr(row, column.name) for column in row.__table__.columns}
+    """
+    Convert SQLAlchemy row to dictionary with safe numeric conversion for all numeric columns.
+    - 'inf' -> 999
+    - '-inf' -> -999
+    - Invalid numbers -> np.nan
+    """
+    result = {}
+    for column in row.__table__.columns:
+        value = getattr(row, column.name)
+
+        # Handle numeric columns
+        if isinstance(column.type, (Numeric, Float, Integer, DECIMAL)):
+            try:
+                f = float(value)
+                if np.isposinf(f):
+                    f = 999
+                elif np.isneginf(f):
+                    f = -999
+                elif np.isnan(f):
+                    f = np.nan  # or 0 if you prefer
+                result[column.name] = f
+            except (ValueError, TypeError):
+                result[column.name] = np.nan  # fallback for invalid strings
+        else:
+            # Non-numeric columns stay as-is
+            result[column.name] = value
+    return result
