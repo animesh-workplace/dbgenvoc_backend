@@ -1,6 +1,5 @@
 from sqlalchemy import (
     Text,
-    Index,
     String,
     Column,
     Boolean,
@@ -47,10 +46,6 @@ class JournalExomeSomaticVariantOncoplot(BaseOncoplotModel):
 class JournalExomeSomaticGeneInteraction(BaseGeneInteractionModel):
     __tablename__ = "journal_exome_somatic_gene_interaction"
 
-    __table_args__ = (
-        Index("index_journal_exome_somatic_gene_interation", "gene1", "gene2"),
-    )
-
 
 class JournalExomeSomaticSampleTMB(BaseSampleTMBModel):
     __tablename__ = "journal_exome_somatic_sample_tmb"
@@ -73,10 +68,6 @@ class TCGAExomeSomaticVariantOncoplot(BaseOncoplotModel):
 
 class TCGAExomeSomaticGeneInteraction(BaseGeneInteractionModel):
     __tablename__ = "tcga_exome_somatic_gene_interaction"
-
-    __table_args__ = (
-        Index("index_tcga_exome_somatic_gene_interation", "gene1", "gene2"),
-    )
 
 
 class TCGAExomeSomaticSampleTMB(BaseSampleTMBModel):
@@ -101,10 +92,6 @@ class NIBMGExomeSomaticVariantOncoplot(BaseOncoplotModel):
 class NIBMGExomeSomaticGeneInteraction(BaseGeneInteractionModel):
     __tablename__ = "nibmg_exome_somatic_gene_interaction"
 
-    __table_args__ = (
-        Index("index_nibmg_exome_somatic_gene_interation", "gene1", "gene2"),
-    )
-
 
 class NIBMGExomeSomaticSampleTMB(BaseSampleTMBModel):
     __tablename__ = "nibmg_exome_somatic_sample_tmb"
@@ -127,10 +114,6 @@ class NIBMGWgSomaticVariantOncoplot(BaseOncoplotModel):
 
 class NIBMGWgSomaticGeneInteraction(BaseGeneInteractionModel):
     __tablename__ = "nibmg_wg_somatic_gene_interaction"
-
-    __table_args__ = (
-        Index("index_nibmg_wg_somatic_gene_interation", "gene1", "gene2"),
-    )
 
 
 class NIBMGWgSomaticSampleTMB(BaseSampleTMBModel):
@@ -155,10 +138,6 @@ class NIBMGExomeGermlineVariantOncoplot(BaseOncoplotModel):
 class NIBMGExomeGermlineGeneInteraction(BaseGeneInteractionModel):
     __tablename__ = "nibmg_exome_germline_gene_interaction"
 
-    __table_args__ = (
-        Index("index_nibmg_exome_germline_gene_interation", "gene1", "gene2"),
-    )
-
 
 class NIBMGExomeGermlineSampleTMB(BaseSampleTMBModel):
     __tablename__ = "nibmg_exome_germline_sample_tmb"
@@ -181,10 +160,6 @@ class NIBMGWgGermlineVariantOncoplot(BaseOncoplotModel):
 
 class NIBMGWgGermlineGeneInteraction(BaseGeneInteractionModel):
     __tablename__ = "nibmg_wg_germline_gene_interaction"
-
-    __table_args__ = (
-        Index("index_nibmg_wg_germline_gene_interation", "gene1", "gene2"),
-    )
 
 
 class NIBMGWgGermlineSampleTMB(BaseSampleTMBModel):
