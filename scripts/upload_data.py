@@ -1,7 +1,7 @@
 import fireducks.pandas as pd
 from sqlalchemy import create_engine
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///database/database.sqlite3"
+SQLALCHEMY_DATABASE_URL = "sqlite:///../database/database.sqlite3"
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
