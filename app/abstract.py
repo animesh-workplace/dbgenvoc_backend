@@ -97,7 +97,7 @@ class BaseOncoplotModel(Base):
     tumor_sample_barcode = Column(
         String(20), ForeignKey("patient_barcode.id"), index=True
     )
-    count = Column(Integer)
+    code = Column(Integer)
     annotation = Column(String(255))
 
     @declared_attr
