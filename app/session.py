@@ -2,8 +2,8 @@ import os
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from agno.models.aws import AwsBedrock
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import registry, sessionmaker
+# from sqlalchemy.ext.declarative import declarative_base
 
 load_dotenv()
 SQLALCHEMY_DATABASE_URL = "sqlite:///database/database.sqlite3"
@@ -23,7 +23,8 @@ ai_engine = AwsBedrock(
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+mapper_registry = registry()
+Base = mapper_registry.generate_base()
 
 
 def get_db():
