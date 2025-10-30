@@ -1,9 +1,9 @@
 from typing import Optional
 from app.session import get_db
 from sqlalchemy.orm import Session
-from app.core import GERMLINE_TABLES
 from app.api.ask_ai import ask_database
 from app.api.search import generic_search
+from app.core import GERMLINE_TABLE_REGISTRY
 from app.api.oncoplot import oncoplot_search
 from app.api.aggregate import generic_aggregate
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,7 +36,7 @@ async def TABLE_SEARCH_API(
 ):
     """Generic search across any table."""
     authenticated_user = require_germline_access(table_name, token_info)
-    if table_name in GERMLINE_TABLES and not authenticated_user:
+    if table_name in GERMLINE_TABLE_REGISTRY and not authenticated_user:
         raise HTTPException(
             status_code=403,
             detail="Access denied for germline tables without valid token",
@@ -53,7 +53,7 @@ async def TABLE_AGGREGATE_API(
 ):
     """Generic aggregation for any table."""
     authenticated_user = require_germline_access(table_name, token_info)
-    if table_name in GERMLINE_TABLES and not authenticated_user:
+    if table_name in GERMLINE_TABLE_REGISTRY and not authenticated_user:
         raise HTTPException(
             status_code=403,
             detail="Access denied for germline tables without valid token",
@@ -72,7 +72,7 @@ async def TABLE_AGGREGATE_CONCATE_API(
 ):
     """Generic concatenated aggregation (e.g., ref_allele>tumor_seq_allele2)."""
     authenticated_user = require_germline_access(table_name, token_info)
-    if table_name in GERMLINE_TABLES and not authenticated_user:
+    if table_name in GERMLINE_TABLE_REGISTRY and not authenticated_user:
         raise HTTPException(
             status_code=403,
             detail="Access denied for germline tables without valid token",
@@ -91,7 +91,7 @@ async def TABLE_ONCOPLOT_API(
 ):
     """Oncoplot search supporting multiple gene terms."""
     authenticated_user = require_germline_access(table_name, token_info)
-    if table_name in GERMLINE_TABLES and not authenticated_user:
+    if table_name in GERMLINE_TABLE_REGISTRY and not authenticated_user:
         raise HTTPException(
             status_code=403,
             detail="Access denied for germline tables without valid token",
@@ -110,7 +110,7 @@ async def TABLE_INTERACTION_API(
 ):
     """Oncoplot search supporting multiple gene terms."""
     authenticated_user = require_germline_access(table_name, token_info)
-    if table_name in GERMLINE_TABLES and not authenticated_user:
+    if table_name in GERMLINE_TABLE_REGISTRY and not authenticated_user:
         raise HTTPException(
             status_code=403,
             detail="Access denied for germline tables without valid token",
