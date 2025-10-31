@@ -130,11 +130,11 @@ class SuggestionType(str, Enum):
 class AutocompleteSuggestion(BaseModel):
     value: str
     type: SuggestionType
-    pathway_genes: Optional[str] = None  # For pathway type
-    table: Optional[str] = None  # For genomic_region type
-    chromosome: Optional[str] = None  # For genomic_region type
-    start: Optional[int] = None  # For genomic_region type
     end: Optional[int] = None  # For genomic_region type
+    table: Optional[str] = None  # For genomic_region type
+    start: Optional[int] = None  # For genomic_region type
+    chromosome: Optional[str] = None  # For genomic_region type
+    pathway_genes: Optional[List[str]] = None  # For pathway type
 
 
 class AutocompleteResponse(BaseModel):
