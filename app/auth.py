@@ -5,7 +5,7 @@ import ipaddress
 from app.models import ApiToken
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from app.core import GERMLINE_TABLES
+from app.core import GERMLINE_TABLE_REGISTRY
 from app.session import get_db, SessionLocal
 from datetime import datetime, timedelta, timezone
 from app.schema import TokenCreateRequest, TokenResponse
@@ -102,7 +102,7 @@ def require_germline_access(
     Check if access to germline table is allowed.
     Raises HTTPException if access denied.
     """
-    if table_name in GERMLINE_TABLES:
+    if table_name in GERMLINE_TABLE_REGISTRY:
         if not token_info:
             raise HTTPException(
                 status_code=401,
