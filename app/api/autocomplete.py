@@ -1,9 +1,9 @@
 from fastapi import HTTPException
 from app.utils import (
-    parse_genomic_region,
-    search_genomic_regions,
+    # parse_genomic_region,
+    # search_genomic_regions,
     search_genes_and_pathways,
-    search_partial_genomic_region,
+    # search_partial_genomic_region,
 )
 
 
