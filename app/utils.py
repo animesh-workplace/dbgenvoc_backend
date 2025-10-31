@@ -29,17 +29,22 @@ async def search_genes_and_pathways(term: str, limit: int, db):
     Pathway = get_model_class("pathway")
     pathway_results = (
         db.query(Pathway)
-        .options(joinedload(Pathway.path_gene))
+        .options(joinedload(Pathway.genes))
         .filter(Pathway.pathway_name.ilike(f"{term}%"))
         .order_by(Pathway.pathway_name)
         .limit(limit)
         .all()
     )
 
-    for pathway_name, path_gene in pathway_results:
+    for pathway in pathway_results:
+        gene_list = [gene.gene for gene in pathway.genes]
+        print(gene_list)
+
         suggestions.append(
             AutocompleteSuggestion(
-                value=pathway_name, type=SuggestionType.PATHWAY, pathway_genes=path_gene
+                pathway_genes=gene_list,
+                value=pathway.pathway_name,
+                type=SuggestionType.PATHWAY,
             )
         )
 
