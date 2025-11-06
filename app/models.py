@@ -1,5 +1,6 @@
 from sqlalchemy import (
     Text,
+    Index,
     String,
     Column,
     Boolean,
@@ -15,6 +16,27 @@ from app.abstract import (
 )
 from app.session import Base
 from sqlalchemy.sql import func
+
+
+class SomaticGenomicPosition(Base):
+    __tablename__ = "somatic_genomic_position"
+
+    count = Column(Integer)
+    end = Column(Integer, index=True, nullable=False)
+    start = Column(Integer, index=True, nullable=False)
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    chromosome = Column(String(20), index=True, nullable=False)
+    # gene_name = Column(String(100), index=True, nullable=True) # Might be added later
+
+    __table_args__ = (
+        Index("index_somatic_genomic_position_chrom_start", "chromosome", "start"),
+        Index(
+            "index_somatic_genomic_position_chrom_start_end",
+            "chromosome",
+            "start",
+            "end",
+        ),
+    )
 
 
 class ApiToken(Base):
