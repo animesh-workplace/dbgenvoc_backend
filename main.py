@@ -1,5 +1,5 @@
-from typing import Optional
 from app.session import get_db
+from typing import Optional, List
 from sqlalchemy.orm import Session
 from app.api.ask_ai import ask_database
 from app.api.search import generic_search
@@ -8,7 +8,7 @@ from app.api.oncoplot import oncoplot_search
 from app.api.aggregate import generic_aggregate
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.interactions import interaction_search
-from app.api.autocomplete import unified_autocomplete
+from app.api.autocomplete import unified_autocomplete, SuggestionSection
 from app.api.concate_aggregate import generic_concatenated_aggregate
 from fastapi import FastAPI, Depends, Path, HTTPException, APIRouter, Query
 from app.auth import verify_germline_token, TokenInfo, require_germline_access
@@ -118,13 +118,12 @@ async def TABLE_INTERACTION_API(
     return await interaction_search(request=request, table_name=table_name, db=db)
 
 
-@api_router.post("/autocomplete", response_model=AutocompleteResponse)
+@api_router.post("/autocomplete", response_model=List[SuggestionSection])
 async def autocomplete_unified(
     request: AutocompleteRequest, db: Session = Depends(get_db)
 ):
     """Unified autocomplete returning genes and pathways with pathway genes"""
-    result = await unified_autocomplete(term=request.term, limit=request.limit, db=db)
-    return AutocompleteResponse(**result)
+    return await unified_autocomplete(term=request.term, limit=request.limit, db=db)
 
 
 @api_router.get("/ask")
