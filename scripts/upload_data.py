@@ -73,12 +73,12 @@ def upload_data():
         # "nibmg_exome_germline_variant_oncoplot": "database/final_db_tables/oncoplot/nibmg_exome_germline_oncoplot.tsv",
         # "nibmg_wg_germline_variant_oncoplot": "database/final_db_tables/oncoplot/nibmg_wg_germline_oncoplot.tsv",
         #     Gene interaction tables
-        "journal_exome_somatic_gene_interaction": "database/final_db_tables/interaction/journal_exome_somatic_interactions.fixed.tsv",
-        "tcga_exome_somatic_gene_interaction": "database/final_db_tables/interaction/tcga_exome_somatic_interactions.fixed.tsv",
-        "nibmg_exome_somatic_gene_interaction": "database/final_db_tables/interaction/nibmg_exome_somatic_interactions.fixed.tsv",
-        "nibmg_wg_somatic_gene_interaction": "database/final_db_tables/interaction/nibmg_wg_somatic_interactions.fixed.tsv",
-        "nibmg_exome_germline_gene_interaction": "database/final_db_tables/interaction/nibmg_exome_germline_interactions.fixed.tsv",
-        "nibmg_wg_germline_gene_interaction": "database/final_db_tables/interaction/nibmg_wg_germline_interactions.fixed.tsv",
+        # "journal_exome_somatic_gene_interaction": "database/final_db_tables/interaction/journal_exome_somatic_interactions.fixed.tsv",
+        # "tcga_exome_somatic_gene_interaction": "database/final_db_tables/interaction/tcga_exome_somatic_interactions.fixed.tsv",
+        # "nibmg_exome_somatic_gene_interaction": "database/final_db_tables/interaction/nibmg_exome_somatic_interactions.fixed.tsv",
+        # "nibmg_wg_somatic_gene_interaction": "database/final_db_tables/interaction/nibmg_wg_somatic_interactions.fixed.tsv",
+        # "nibmg_exome_germline_gene_interaction": "database/final_db_tables/interaction/nibmg_exome_germline_interactions.fixed.tsv",
+        # "nibmg_wg_germline_gene_interaction": "database/final_db_tables/interaction/nibmg_wg_germline_interactions.fixed.tsv",
         #     TMB tables
         # "journal_exome_somatic_sample_tmb": "database/final_db_tables/tmb/journal_exome_somatic_tmb.tsv",
         # "tcga_exome_somatic_sample_tmb": "database/final_db_tables/tmb/tcga_exome_somatic_tmb.tsv",
@@ -93,6 +93,7 @@ def upload_data():
         # "nibmg_wg_somatic_sample_titv": "database/final_db_tables/titv/nibmg_wg_somatic_titv.tsv",
         # "nibmg_exome_germline_sample_titv": "database/final_db_tables/titv/nibmg_exome_germline_titv.tsv",
         # "nibmg_wg_germline_sample_titv": "database/final_db_tables/titv/nibmg_wg_germline_titv.tsv",
+        # "somatic_genomic_position": "database/final_db_tables/autocomplete/somatic_autocomplete_table.tsv"
     }
 
     # Define your batch size
