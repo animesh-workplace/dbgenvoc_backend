@@ -18,6 +18,7 @@ dependencies = [
     "llama-index-llms-ollama>=0.7.3",
     "mpire>=2.10.2",
     "plotly>=6.3.1",
+    "pyranges>=0.1.4",
     "python-dotenv>=1.1.1",
     "scipy>=1.16.2",
     "sentence-transformers>=5.1.0",
