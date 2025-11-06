@@ -38,7 +38,6 @@ async def search_genes_and_pathways(term: str, limit: int, db):
 
     for pathway in pathway_results:
         gene_list = [gene.gene for gene in pathway.genes]
-        print(gene_list)
 
         suggestions.append(
             AutocompleteSuggestion(
