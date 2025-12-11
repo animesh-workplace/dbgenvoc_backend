@@ -37,8 +37,13 @@ class SuggestionSection(BaseModel):
     items: Union[
         List[SuggestionGeneItem],
         List[SuggestionPathwayItem],
-        List[SuggestionPositionItem],
+        Optional[List[SuggestionPositionItem]],
     ]
+
+
+class AutocompleteRequest(BaseModel):
+    term: str
+    limit: int = 10
 
 
 async def unified_autocomplete(db, term: str, limit: int = 10):
@@ -80,130 +85,130 @@ async def unified_autocomplete(db, term: str, limit: int = 10):
         ]
 
         # Fetching chromosome position from the genomic positions DB
-        GenomicPosition = get_model_class("somatic_genomic_position")
+        # GenomicPosition = get_model_class("somatic_genomic_position")
         genomic_suggestions = []
-        clean_term = term.strip()
+        # clean_term = term.strip()
 
-        # If user provided a chrom:part
-        if ":" in clean_term:
-            chrom, coords_part = clean_term.split(":", 1)
-            chrom = chrom.strip()
-            coords_part = coords_part.strip()
+        # # If user provided a chrom:part
+        # if ":" in clean_term:
+        #     chrom, coords_part = clean_term.split(":", 1)
+        #     chrom = chrom.strip()
+        #     coords_part = coords_part.strip()
 
-            # Range input: "chr1:915188-1015188"
-            if "-" in coords_part:
-                try:
-                    start_str, end_str = coords_part.split("-", 1)
-                    start_q = int(start_str.replace(",", "").strip())
-                    end_q = int(end_str.replace(",", "").strip())
+        #     # Range input: "chr1:915188-1015188"
+        #     if "-" in coords_part:
+        #         try:
+        #             start_str, end_str = coords_part.split("-", 1)
+        #             start_q = int(start_str.replace(",", "").strip())
+        #             end_q = int(end_str.replace(",", "").strip())
 
-                    # Swap if reversed
-                    if end_q < start_q:
-                        start_q, end_q = end_q, start_q
+        #             # Swap if reversed
+        #             if end_q < start_q:
+        #                 start_q, end_q = end_q, start_q
 
-                    # Find records that overlap the queried range:
-                    # record.end >= start_q AND record.start <= end_q
-                    query = (
-                        db.query(GenomicPosition)
-                        .filter(
-                            and_(
-                                GenomicPosition.chromosome.ilike(f"{chrom}%"),
-                                GenomicPosition.end >= start_q,
-                                GenomicPosition.start <= end_q,
-                            )
-                        )
-                        .order_by(GenomicPosition.start)
-                        .limit(limit)
-                    )
-                    results = query.all()
+        #             # Find records that overlap the queried range:
+        #             # record.end >= start_q AND record.start <= end_q
+        #             query = (
+        #                 db.query(GenomicPosition)
+        #                 .filter(
+        #                     and_(
+        #                         GenomicPosition.chromosome.ilike(f"{chrom}%"),
+        #                         GenomicPosition.end >= start_q,
+        #                         GenomicPosition.start <= end_q,
+        #                     )
+        #                 )
+        #                 .order_by(GenomicPosition.start)
+        #                 .limit(limit)
+        #             )
+        #             results = query.all()
 
-                    genomic_suggestions = [
-                        SuggestionPositionItem(
-                            end=r.end,
-                            start=r.start,
-                            chromosome=r.chromosome,
-                            value=f"{r.chromosome}:{r.start}-{r.end}",
-                        )
-                        for r in results
-                    ]
-                except ValueError:
-                    # malformed numbers — return no suggestions for genomic region
-                    genomic_suggestions = []
+        #             genomic_suggestions = [
+        #                 SuggestionPositionItem(
+        #                     end=r.end,
+        #                     start=r.start,
+        #                     chromosome=r.chromosome,
+        #                     value=f"{r.chromosome}:{r.start}-{r.end}",
+        #                 )
+        #                 for r in results
+        #             ]
+        #         except ValueError:
+        #             # malformed numbers — return no suggestions for genomic region
+        #             genomic_suggestions = []
 
-            # Single numeric coordinate: "chr1:915188" -> find records that contain this position
-            else:
-                # If coords_part looks numeric, treat as position. Otherwise fallback to prefix-match on start.
-                digits = coords_part.replace(",", "").strip()
-                if digits.isdigit():
-                    pos_q = int(digits)
-                    query = (
-                        db.query(GenomicPosition)
-                        .filter(
-                            and_(
-                                GenomicPosition.chromosome.ilike(f"{chrom}%"),
-                                GenomicPosition.start <= pos_q,
-                                GenomicPosition.end >= pos_q,
-                            )
-                        )
-                        .order_by(GenomicPosition.start)
-                        .limit(limit)
-                    )
-                    results = query.all()
+        #     # Single numeric coordinate: "chr1:915188" -> find records that contain this position
+        #     else:
+        #         # If coords_part looks numeric, treat as position. Otherwise fallback to prefix-match on start.
+        #         digits = coords_part.replace(",", "").strip()
+        #         if digits.isdigit():
+        #             pos_q = int(digits)
+        #             query = (
+        #                 db.query(GenomicPosition)
+        #                 .filter(
+        #                     and_(
+        #                         GenomicPosition.chromosome.ilike(f"{chrom}%"),
+        #                         GenomicPosition.start <= pos_q,
+        #                         GenomicPosition.end >= pos_q,
+        #                     )
+        #                 )
+        #                 .order_by(GenomicPosition.start)
+        #                 .limit(limit)
+        #             )
+        #             results = query.all()
 
-                    genomic_suggestions = [
-                        SuggestionPositionItem(
-                            end=r.end,
-                            start=r.start,
-                            chromosome=r.chromosome,
-                            value=f"{r.chromosome}:{r.start}-{r.end}",
-                        )
-                        for r in results
-                    ]
-                else:
-                    # Fallback: user typed something like chr1:915 (partial) — do prefix-match on start
-                    query = (
-                        db.query(GenomicPosition)
-                        .filter(GenomicPosition.chromosome.ilike(f"{chrom}%"))
-                        .filter(
-                            cast(GenomicPosition.start, String).like(f"{coords_part}%")
-                        )
-                        .order_by(GenomicPosition.start)
-                        .limit(limit)
-                    )
-                    results = query.all()
-                    genomic_suggestions = [
-                        SuggestionPositionItem(
-                            end=r.end,
-                            start=r.start,
-                            chromosome=r.chromosome,
-                            value=f"{r.chromosome}:{r.start}-{r.end}",
-                        )
-                        for r in results
-                    ]
+        #             genomic_suggestions = [
+        #                 SuggestionPositionItem(
+        #                     end=r.end,
+        #                     start=r.start,
+        #                     chromosome=r.chromosome,
+        #                     value=f"{r.chromosome}:{r.start}-{r.end}",
+        #                 )
+        #                 for r in results
+        #             ]
+        #         else:
+        #             # Fallback: user typed something like chr1:915 (partial) — do prefix-match on start
+        #             query = (
+        #                 db.query(GenomicPosition)
+        #                 .filter(GenomicPosition.chromosome.ilike(f"{chrom}%"))
+        #                 .filter(
+        #                     cast(GenomicPosition.start, String).like(f"{coords_part}%")
+        #                 )
+        #                 .order_by(GenomicPosition.start)
+        #                 .limit(limit)
+        #             )
+        #             results = query.all()
+        #             genomic_suggestions = [
+        #                 SuggestionPositionItem(
+        #                     end=r.end,
+        #                     start=r.start,
+        #                     chromosome=r.chromosome,
+        #                     value=f"{r.chromosome}:{r.start}-{r.end}",
+        #                 )
+        #                 for r in results
+        #             ]
 
-        # Only chromosome prefix: "chr1"
-        else:
-            query = (
-                db.query(GenomicPosition)
-                .filter(GenomicPosition.chromosome.ilike(f"{clean_term}%"))
-                .order_by(GenomicPosition.count)
-                .limit(limit)
-            )
-            results = query.all()
-            genomic_suggestions = [
-                SuggestionPositionItem(
-                    end=r.end,
-                    start=r.start,
-                    chromosome=r.chromosome,
-                    value=f"{r.chromosome}:{r.start}-{r.end}",
-                )
-                for r in results
-            ]
+        # # Only chromosome prefix: "chr1"
+        # else:
+        #     query = (
+        #         db.query(GenomicPosition)
+        #         .filter(GenomicPosition.chromosome.ilike(f"{clean_term}%"))
+        #         .order_by(GenomicPosition.count)
+        #         .limit(limit)
+        #     )
+        #     results = query.all()
+        #     genomic_suggestions = [
+        #         SuggestionPositionItem(
+        #             end=r.end,
+        #             start=r.start,
+        #             chromosome=r.chromosome,
+        #             value=f"{r.chromosome}:{r.start}-{r.end}",
+        #         )
+        #         for r in results
+        #     ]
 
         return [
             SuggestionSection(label="Genes", items=gene_suggestions),
             SuggestionSection(label="Pathways", items=pathway_suggestion),
-            SuggestionSection(label="Genomic Regions", items=genomic_suggestions),
+            # SuggestionSection(label="Genomic Regions", items=genomic_suggestions),
         ]
 
     except Exception as e:
