@@ -1,133 +1,176 @@
-from app.core import (
-    get_model_class,
-    validate_columns,
-)
-from sqlalchemy import and_, func
+from enum import Enum
+from sqlalchemy import func
 from fastapi import HTTPException
-from app.schema import AggregationRequest, AggregationType, AggregationResponse
+from app.schema_new import ComplexFilter
+from pydantic import BaseModel, Field
+from typing import Any, Dict, List, Optional, Union
+from app.core import get_model_class, validate_columns, apply_filters
+
+# ==========================================
+#               SCHEMAS
+# ==========================================
 
 
-async def generic_aggregate(request: AggregationRequest, db, table_name):
-    """Generic aggregation for any table."""
+class AggregationType(str, Enum):
+    sum = "sum"
+    avg = "avg"
+    min = "min"
+    max = "max"
+    count = "count"
+    percentage = "percentage"
+    distinct_count = "distinct_count"
+
+
+class AggregationRequest(BaseModel):
+    column: str = Field(..., description="Target column for aggregation")
+    group_by: Optional[List[str]] = Field(None, description="Columns to group by")
+    # Recursive AND/OR logic
+    filters: Optional[ComplexFilter] = Field(
+        None, description="Complex filters with AND/OR logic"
+    )
+    aggregation_type: AggregationType = Field(
+        AggregationType.count, description="Type of aggregation"
+    )
+
+
+class AggregationResponse(BaseModel):
+    column: str
+    table_name: str
+    total_records: int
+    aggregation_type: str
+    # Flexible result: either a simple dict (value) or list of grouped dicts
+    result: Union[Dict[str, Any], List[Dict[str, Any]]]
+
+
+# ==========================================
+#           INTERNAL HELPERS
+# ==========================================
+
+
+async def _calculate_standard_agg(query, col_attr, agg_type: AggregationType):
+    """Handles standard scalar aggregations (Count, Sum, Avg, etc)."""
+    funcs = {
+        AggregationType.sum: func.sum(col_attr),
+        AggregationType.avg: func.avg(col_attr),
+        AggregationType.min: func.min(col_attr),
+        AggregationType.max: func.max(col_attr),
+        AggregationType.count: func.count(col_attr),
+        AggregationType.distinct_count: func.count(func.distinct(col_attr)),
+    }
+    return query.with_entities(funcs[agg_type]).scalar() or 0
+
+
+async def _calculate_global_percentage(query, db, model_class, col_attr):
+    """Calculates percentage for non-grouped queries: (Filtered / Total) * 100"""
+    numerator = query.with_entities(func.count(col_attr)).scalar() or 0
+    # Denominator: Total count in table (ignoring filters)
+    denominator = db.query(func.count(col_attr)).select_from(model_class).scalar() or 1
+
+    if denominator == 0:
+        return 0.0
+    return round((numerator / denominator) * 100, 2)
+
+
+# ==========================================
+#           MAIN AGGREGATION API
+# ==========================================
+
+
+async def generic_aggregate(
+    request: AggregationRequest, db, table_name: str
+) -> AggregationResponse:
+    """
+    Generic aggregation for any table supporting complex filters and grouping.
+    """
     try:
         model_class = get_model_class(table_name)
 
-        # Validate column
+        # 1. Validate Columns
         validate_columns(model_class, [request.column])
-        col_attr = getattr(model_class, request.column)
-
-        # Validate group_by columns if provided
         if request.group_by:
             validate_columns(model_class, request.group_by)
 
-        # Start building query
+        col_attr = getattr(model_class, request.column)
+
+        # 2. Build Query & Apply Filters
         query = db.query(model_class)
+        query = apply_filters(query, model_class, request.filters)
 
-        # Apply filters
-        filter_conditions = []
-        if request.filters:
-            for filter_col, filter_value in request.filters.items():
-                if hasattr(model_class, filter_col):
-                    filter_attr = getattr(model_class, filter_col)
-                    if isinstance(filter_value, list):
-                        filter_conditions.append(filter_attr.in_(filter_value))
-                    else:
-                        filter_conditions.append(filter_attr == filter_value)
-
-            if filter_conditions:
-                query = query.filter(and_(*filter_conditions))
-
-        # Get total records
+        # 3. Capture Total Records (Snapshot of filtered dataset)
         total_records = query.count()
 
-        # Perform aggregation
+        # 4. Perform Aggregation
         if request.group_by:
-            # Group by aggregation
-            group_columns = [getattr(model_class, col) for col in request.group_by]
+            # --- Grouped Aggregation ---
+            group_attrs = [getattr(model_class, c) for c in request.group_by]
 
-            # Build aggregation function
-            agg_functions = {
-                AggregationType.count: func.count(col_attr),
-                AggregationType.sum: func.sum(col_attr),
-                AggregationType.avg: func.avg(col_attr),
-                AggregationType.min: func.min(col_attr),
-                AggregationType.max: func.max(col_attr),
-                AggregationType.distinct_count: func.count(func.distinct(col_attr)),
-            }
+            if request.aggregation_type == AggregationType.percentage:
+                # Formula: (Group Count / Total Filtered Records) * 100
+                agg_expr = (func.count(col_attr) * 100.0) / (
+                    total_records if total_records > 0 else 1
+                )
+            else:
+                funcs = {
+                    AggregationType.count: func.count(col_attr),
+                    AggregationType.sum: func.sum(col_attr),
+                    AggregationType.avg: func.avg(col_attr),
+                    AggregationType.min: func.min(col_attr),
+                    AggregationType.max: func.max(col_attr),
+                    AggregationType.distinct_count: func.count(func.distinct(col_attr)),
+                }
+                agg_expr = funcs.get(request.aggregation_type)
 
-            agg_func = agg_functions[request.aggregation_type]
-            agg_query = db.query(
-                *group_columns, agg_func.label("aggregated_value")
-            ).group_by(*group_columns)
+            # Execute Group By
+            results = (
+                query.with_entities(*group_attrs, agg_expr.label("val"))
+                .group_by(*group_attrs)
+                .all()
+            )
 
-            # Apply filters to aggregation query
-            if filter_conditions:
-                agg_query = agg_query.filter(and_(*filter_conditions))
-
-            results = agg_query.all()
-
-            # Format results
+            # Format Results
             formatted_results = []
             for result in results:
                 result_dict = {}
+                # Map group columns to their values
                 for i, group_col in enumerate(request.group_by):
                     result_dict[group_col] = result[i]
-                result_dict["aggregated_value"] = result[-1]
+
+                # Handle value formatting
+                val = result[-1]
+                if (
+                    request.aggregation_type == AggregationType.percentage
+                    and val is not None
+                ):
+                    val = round(float(val), 2)
+
+                result_dict["aggregated_value"] = val
                 formatted_results.append(result_dict)
 
-            return AggregationResponse(
-                table_name=table_name,
-                column=request.column,
-                result=formatted_results,
-                total_records=total_records,
-                aggregation_type=request.aggregation_type.value,
-            )
+            final_result = formatted_results
 
         else:
-            # Simple aggregation
-            agg_functions = {
-                AggregationType.count: query.count(),
-                AggregationType.sum: db.query(func.sum(col_attr))
-                .filter(*filter_conditions)
-                .scalar()
-                or 0
-                if filter_conditions
-                else db.query(func.sum(col_attr)).scalar() or 0,
-                AggregationType.avg: db.query(func.avg(col_attr))
-                .filter(*filter_conditions)
-                .scalar()
-                or 0
-                if filter_conditions
-                else db.query(func.avg(col_attr)).scalar() or 0,
-                AggregationType.min: db.query(func.min(col_attr))
-                .filter(*filter_conditions)
-                .scalar()
-                if filter_conditions
-                else db.query(func.min(col_attr)).scalar(),
-                AggregationType.max: db.query(func.max(col_attr))
-                .filter(*filter_conditions)
-                .scalar()
-                if filter_conditions
-                else db.query(func.max(col_attr)).scalar(),
-                AggregationType.distinct_count: db.query(
-                    func.count(func.distinct(col_attr))
+            # --- Scalar Aggregation (No Group By) ---
+            if request.aggregation_type == AggregationType.percentage:
+                val = await _calculate_global_percentage(
+                    query, db, model_class, col_attr
                 )
-                .filter(*filter_conditions)
-                .scalar()
-                or 0
-                if filter_conditions
-                else db.query(func.count(func.distinct(col_attr))).scalar() or 0,
-            }
+                final_result = {"value": val}
+            else:
+                val = await _calculate_standard_agg(
+                    query, col_attr, request.aggregation_type
+                )
+                final_result = {"value": val}
 
-            result = agg_functions[request.aggregation_type]
+        # 5. Return Response
+        return AggregationResponse(
+            result=final_result,
+            table_name=table_name,
+            column=request.column,
+            total_records=total_records,
+            aggregation_type=request.aggregation_type.value,
+        )
 
-            return AggregationResponse(
-                table_name=table_name,
-                column=request.column,
-                result={"value": result},
-                total_records=total_records,
-                aggregation_type=request.aggregation_type.value,
-            )
-
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Aggregation failed: {str(e)}")
