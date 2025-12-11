@@ -1,25 +1,31 @@
+# from app.api.search import generic_search
+# from app.api.aggregate import generic_aggregate
 from app.session import get_db
 from typing import Optional, List
 from sqlalchemy.orm import Session
 from app.api.ask_ai import ask_database
-from app.api.search import generic_search
 from app.core import GERMLINE_TABLE_REGISTRY
 from app.api.oncoplot import oncoplot_search
-from app.api.aggregate import generic_aggregate
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.interactions import interaction_search
-from app.api.autocomplete import unified_autocomplete, SuggestionSection
 from app.api.concate_aggregate import generic_concatenated_aggregate
+from app.api.search import SearchRequest, SearchResponse, generic_search
 from fastapi import FastAPI, Depends, Path, HTTPException, APIRouter, Query
 from app.auth import verify_germline_token, TokenInfo, require_germline_access
-from app.schema import (
-    SearchRequest,
-    SearchResponse,
-    OncoplotRequest,
-    AggregationRequest,
-    AggregationResponse,
+from app.api.aggregate import generic_aggregate, AggregationRequest, AggregationResponse
+from app.api.autocomplete import (
+    unified_autocomplete,
+    SuggestionSection,
     AutocompleteRequest,
-    AutocompleteResponse,
+)
+from app.schema import (
+    # SearchRequest,
+    # SearchResponse,
+    # AggregationRequest,
+    # AggregationResponse,
+    # AutocompleteRequest,
+    # AutocompleteResponse,
+    OncoplotRequest,
     ConcatenatedAggregationRequest,
 )
 
@@ -135,7 +141,7 @@ async def ask_endpoint(
 
 
 app = FastAPI()
-origins = ["http://10.10.6.80"]
+origins = ["http://10.10.6.80", "*"]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
