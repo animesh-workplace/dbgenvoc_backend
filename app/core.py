@@ -1,8 +1,11 @@
 import app.models  # Needs to be there for ALL_TABLE_REGISTRY to work
 import numpy as np
 from app.session import Base
+from sqlalchemy import and_, or_
+from sqlalchemy.orm import Query
 from fastapi import HTTPException
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
+from app.schema_new import ComplexFilter, FilterCondition
 from sqlalchemy.sql.sqltypes import Numeric, Float, Integer, DECIMAL
 
 # Table registry mapping table names to models
@@ -87,3 +90,57 @@ def row_to_dict(row) -> Dict[str, Any]:
             # Non-numeric columns stay as-is
             result[column.name] = value
     return result
+
+
+def _build_filter_expression(
+    model_class, filter_data: Union[ComplexFilter, FilterCondition]
+):
+    """Recursively builds SQLAlchemy filter expressions with AND/OR logic."""
+
+    # Case 1: Leaf Node (Actual Condition)
+    if isinstance(filter_data, FilterCondition):
+        if not hasattr(model_class, filter_data.column):
+            return None  # Ignore invalid columns or raise error
+
+        attr = getattr(model_class, filter_data.column)
+        val = filter_data.value
+
+        ops = {
+            "eq": lambda: attr == val,
+            "neq": lambda: attr != val,
+            "gt": lambda: attr > val,
+            "lt": lambda: attr < val,
+            "in": lambda: attr.in_(val) if isinstance(val, list) else attr.in_([val]),
+            "not_in": lambda: ~attr.in_(val)
+            if isinstance(val, list)
+            else ~attr.in_([val]),
+            "like": lambda: attr.like(f"%{val}%"),
+        }
+        return ops.get(filter_data.operator, lambda: attr == val)()
+
+    # Case 2: Branch Node (AND/OR Logic)
+    if isinstance(filter_data, ComplexFilter):
+        conditions = [
+            _build_filter_expression(model_class, cond)
+            for cond in filter_data.conditions
+        ]
+        # Filter out None values
+        conditions = [c for c in conditions if c is not None]
+
+        if not conditions:
+            return None
+
+        if filter_data.logic == "OR":
+            return or_(*conditions)
+        return and_(*conditions)
+
+    return None
+
+
+def apply_filters(query: Query, model_class, filters: ComplexFilter) -> Query:
+    if not filters:
+        return query
+    expression = _build_filter_expression(model_class, filters)
+    if expression is not None:
+        return query.filter(expression)
+    return query
