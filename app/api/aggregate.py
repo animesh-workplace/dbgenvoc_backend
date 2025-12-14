@@ -1,8 +1,8 @@
 from enum import Enum
 from sqlalchemy import func
 from fastapi import HTTPException
-from app.schema_new import ComplexFilter
 from pydantic import BaseModel, Field
+from app.schema_new import ComplexFilter
 from typing import Any, Dict, List, Optional, Union
 from app.core import get_model_class, validate_columns, apply_filters
 
