@@ -1,5 +1,3 @@
-# from app.api.search import generic_search
-# from app.api.aggregate import generic_aggregate
 from app.session import get_db
 from typing import Optional, List
 from sqlalchemy.orm import Session
@@ -8,25 +6,21 @@ from app.core import GERMLINE_TABLE_REGISTRY
 from app.api.oncoplot import oncoplot_search
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.interactions import interaction_search
-from app.api.concate_aggregate import generic_concatenated_aggregate
 from app.api.search import SearchRequest, SearchResponse, generic_search
 from fastapi import FastAPI, Depends, Path, HTTPException, APIRouter, Query
 from app.auth import verify_germline_token, TokenInfo, require_germline_access
 from app.api.aggregate import generic_aggregate, AggregationRequest, AggregationResponse
+from app.api.aggregate_combination import (
+    ConcatenatedAggregationRequest,
+    generic_concatenated_aggregate,
+)
 from app.api.autocomplete import (
     unified_autocomplete,
     SuggestionSection,
     AutocompleteRequest,
 )
 from app.schema import (
-    # SearchRequest,
-    # SearchResponse,
-    # AggregationRequest,
-    # AggregationResponse,
-    # AutocompleteRequest,
-    # AutocompleteResponse,
     OncoplotRequest,
-    ConcatenatedAggregationRequest,
 )
 
 api_router = APIRouter()
