@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field, field_validator
-from typing import Any, Dict, List, Optional, Union, Literal
+from pydantic import BaseModel
+from typing import Any, List, Union, Literal
 
 
 class FilterCondition(BaseModel):
