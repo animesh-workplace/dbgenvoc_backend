@@ -6,7 +6,7 @@ from app.api.aggregate import generic_aggregate
 from app.agents.orchestrator import orchestrator_agent
 from app.agents.search import search_agent, SearchModel
 from app.agents.aggregate import aggregate_agent, AggregationModel
-from app.api.concate_aggregate import generic_concatenated_aggregate
+from app.api.aggregate_combination import generic_concatenated_aggregate
 from app.agents.synthesizer import preprocess_results_for_synthesis, synthesizer_agent
 from app.agents.concate_aggregate import (
     concate_aggregate_agent,
