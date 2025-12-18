@@ -9,6 +9,7 @@ from app.api.interactions import interaction_search
 from app.api.search import SearchRequest, SearchResponse, generic_search
 from fastapi import FastAPI, Depends, Path, HTTPException, APIRouter, Query
 from app.auth import verify_germline_token, TokenInfo, require_germline_access
+from app.api.structure import get_protein_structure, StructureResponse, StructureRequest
 from app.api.aggregate import generic_aggregate, AggregationRequest, AggregationResponse
 from app.api.aggregate_combination import (
     ConcatenatedAggregationRequest,
@@ -124,6 +125,14 @@ async def autocomplete_unified(
 ):
     """Unified autocomplete returning genes and pathways with pathway genes"""
     return await unified_autocomplete(term=request.term, limit=request.limit, db=db)
+
+
+@api_router.post("/structure", response_model=StructureResponse)
+async def fetch_structure(request: StructureRequest, db: Session = Depends(get_db)):
+    """
+    Get protein structure domains/regions dynamically by gene name.
+    """
+    return await get_protein_structure(request, db)
 
 
 @api_router.get("/ask")
