@@ -25,3 +25,8 @@ dependencies = [
     "sqlalchemy>=2.0.42",
     "umap-learn>=0.5.9.post2",
 ]
+
+[tool.uv.workspace]
+members = [
+    "scripts",
+]
