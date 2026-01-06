@@ -1,7 +1,7 @@
 from agno.agent import Agent
-from app.session import ai_engine
 from app.schema import SearchRequest
 from pydantic import BaseModel, Field
+from app.session import ai_engine_lite as ai_engine
 
 
 class SearchModel(BaseModel):
@@ -16,35 +16,19 @@ search_agent = Agent(
     system_message="""
         You are an expert parameter extraction agent. Your sole purpose is to parse a user's query context and construct a valid JSON object that can be used to call a search API.
 
-        **Database Schema & Mappings**
-        You have access to the following tables. Use the user's query to identify the correct `table_name` based on its description and its available identifiers.
+        **1. Database Schema (STRICT MAPPING REQUIRED)**
+        You MUST map the user's request to exactly one of these internal table names:
+        - `tcga_exome_somatic_variants`: TCGA somatic mutation data (USA).
+        - `nibmg_exome_somatic_variants`: NIBMG exome sequencing (100 Indian patients).
+        - `nibmg_wg_somatic_variants`: NIBMG whole genome sequencing (5 Indian patients).
+        - `journal_exome_somatic_variants`: Manually curated recent studies (118 Indian patients).
 
-        * **Table Name**: `es_tcga`
-            * **Description**: Somatic mutation data from The Cancer Genome Atlas (TCGA) of 220 patient samples drawn from the USA.
-            * **Key Identifiers**: `tumor_sample_barcode`. **Note: This table does NOT have a unique patient ID (`sample_id`).**
-            * **Keywords/Aliases**: "tcga", "tcga dataset"
-
-        * **Table Name**: `exome_somatic`
-            * **Description**: Somatic mutation data from NIBMG's **exome** sequencing of 100 Indian oral cancer patients.
-            * **Key Identifiers**: `sample_id` (unique patient identifier), `tumor_sample_barcode`.
-            * **Keywords/Aliases**: "nibmg", "nibmg exome"
-
-        * **Table Name**: `wg_somatic`
-            * **Description**: Somatic mutation data from NIBMG's **whole genome** sequencing (WGS) of 5 Indian oral cancer patients.
-            * **Key Identifiers**: `sample_id` (unique patient identifier), `tumor_sample_barcode`.
-            * **Keywords/Aliases**: "nibmg wgs", "nibmg whole genome"
-
-        * **Table Name**: `es_journal`
-            * **Description**: Contains variants from manually curated recent studies of 118 patients from India.
-            * **Key Identifiers**: `tumor_sample_barcode`. **Note: This table does NOT have a unique patient ID (`sample_id`).**
-            * **Keywords/Aliases**: "journal", "recent studies"
-
-        **Column Semantic Mappings**
-        This section maps common user terms to the actual database column names and values. Use this as a guide to interpret user intent.
-        
-        * When a user mentions **'patient'**, **'patients'**, or **'sample'**, it refers to the **`sample_id`** column. For counting distinct patients, perform a `distinct_count` on the `sample_id` column.
-        * When a user mentions **'SNV'** (Single Nucleotide Variant), they are referring to the value **'SNP'** (Single Nucleotide Polymorphism) within the `variant_type` column.
-        * When a user mentions oral cancer, 'Oral Squamous Cell Carcinoma', or its subtypes (OSCC, OTSCC, BM-TCGA, OC-TCGA, OT-TCGA, OSCC_GB), these terms refer to values within the disease column. The agent should filter the disease column for these terms.
+        **2. Key Column Mapping Changes**
+        - **Patients/Samples/Cases**: Map to **`tumor_sample_barcode`**. 
+        - **Counting Patients**: To count how many unique patients/samples are affected, use `column: "tumor_sample_barcode"` and `aggregation_type: "distinct_count"`.
+        - **Mutations/Variants**: Map to `column: "variant_id"`. Use `aggregation_type: "count"`.
+        - **SNV**: Always map to `value: "SNP"` in the `variant_type` column.
+        - When a user mentions oral cancer, 'Oral Squamous Cell Carcinoma', or its subtypes (OSCC, OTSCC, BM-TCGA, OC-TCGA, OT-TCGA, OSCC_GB), these terms refer to values within the disease column. The agent should filter the disease column for these terms.
 
         **Key Searchable Columns**
         When a user asks about a specific attribute, map it to one of the following columns:
