@@ -1,7 +1,9 @@
 from agno.agent import Agent
-from app.session import ai_engine
 from pydantic import BaseModel, Field
-from app.schema import AggregationRequest
+from app.api.aggregate import AggregationRequest
+from app.session import ai_engine_lite as ai_engine
+from app.prompt_engineering.critical_rule import rules
+from app.prompt_engineering.examples.aggregate import examples
 
 
 class AggregationModel(BaseModel):
@@ -12,96 +14,115 @@ class AggregationModel(BaseModel):
 
 
 aggregate_agent = Agent(
+    retries=4,  # Add retry mechanism
     model=ai_engine,
     use_json_mode=True,
     output_schema=AggregationModel,
-    system_message="""
-        You are an expert parameter extraction agent for aggregation requests. Your task is to parse the query context and construct a valid JSON object of parameters for the `generic_aggregate` API.
+    system_message=f"""
+        You are an expert bioinformatician and data analyst for the dbGENVOC database. 
+        Your task is to transform the `query_context` into a valid Aggregation API request.
 
-        **Database Schema & Mappings**
-        You have access to the following tables. Use the user's query to identify the correct `table_name` based on its description and its available identifiers.
+        **CRITICAL: OUTPUT FORMAT ENFORCEMENT**
+        You MUST ALWAYS return a valid JSON object matching the AggregationModel schema.
+        NEVER return plain text, explanations, or error messages outside the JSON structure.
+        Every response must have exactly two keys: "table_name" and "request_body".
 
-        * **Table Name**: `es_tcga`
-            * **Description**: Somatic mutation data from The Cancer Genome Atlas (TCGA) of 220 patient samples drawn from the USA.
-            * **Key Identifiers**: `tumor_sample_barcode`. **Note: This table does NOT have a unique patient ID (`sample_id`).**
-            * **Keywords/Aliases**: "tcga", "tcga dataset"
-
-        * **Table Name**: `exome_somatic`
-            * **Description**: Somatic mutation data from NIBMG's **exome** sequencing of 100 Indian oral cancer patients.
-            * **Key Identifiers**: `sample_id` (unique patient identifier), `tumor_sample_barcode`.
-            * **Keywords/Aliases**: "nibmg", "nibmg exome"
-
-        * **Table Name**: `wg_somatic`
-            * **Description**: Somatic mutation data from NIBMG's **whole genome** sequencing (WGS) of 5 Indian oral cancer patients.
-            * **Key Identifiers**: `sample_id` (unique patient identifier), `tumor_sample_barcode`.
-            * **Keywords/Aliases**: "nibmg wgs", "nibmg whole genome"
-
-        * **Table Name**: `es_journal`
-            * **Description**: Contains variants from manually curated recent studies of 118 patients from India.
-            * **Key Identifiers**: `tumor_sample_barcode`. **Note: This table does NOT have a unique patient ID (`sample_id`).**
-            * **Keywords/Aliases**: "journal", "recent studies"
-
-        **Column Semantic Mappings**
-        This section maps common user terms to the actual database column names and values. Use this as a guide to interpret user intent.
+        {rules}
         
-        * When a user mentions **'patient'**, **'patients'**, or **'sample'**, it refers to the **`sample_id`** column. For counting distinct patients, perform a `distinct_count` on the `sample_id` column.
-        * When a user mentions **'SNV'** (Single Nucleotide Variant), they are referring to the value **'SNP'** (Single Nucleotide Polymorphism) within the `variant_type` column.
-        * When a user mentions oral cancer, 'Oral Squamous Cell Carcinoma', or its subtypes (OSCC, OTSCC, BM-TCGA, OC-TCGA, OT-TCGA, OSCC_GB), these terms refer to values within the disease column. The agent should filter the disease column for these terms.
+        If the query_context does not specify a table or mentions "all datasets", you should REJECT this by 
+        returning a minimal valid structure with an impossible filter (this signals upstream to handle it differently).
 
-        **Key Columns for Aggregation & Filtering**
-        When a user asks about a specific attribute, map it to one of the following columns:
+        **2. Key Column Mapping (STRICT RULES)**
+        - **Patients/Samples/Cases/Individuals**: ALWAYS map to **`tumor_sample_barcode`**
+        - **Counting Unique Patients**: Use `column: "tumor_sample_barcode"` with `aggregation_type: "distinct_count"`
+        - **Counting Total Mutations/Variants/Records**: Use `column: "variant_id"` with `aggregation_type: "count"`
+        - **SNV/SNP Variants**: Map to `value: "SNP"` in the `variant_type` column (NOT "SNV")
+        - **Oral Cancer Terms**: Terms like "oral cancer", "Oral Squamous Cell Carcinoma", "OSCC", "OTSCC", 
+          "BM-TCGA", "OC-TCGA", "OT-TCGA", "OSCC_GB" are values in the `disease` column - filter accordingly
+        - **Gene Names**: ALWAYS use the `gene` column, ALWAYS uppercase (e.g., "TP53", not "tp53")
+        - **Variant Classification**: Use the `variant_classification` column for terms like "silent", "missense", "nonsense"
 
-        * `gene`: The official gene symbol (e.g., "BRCA1", "TP53").
-        * `variant_type`: The type of variant (e.g., "SNP", "INS", "DEL").
-        * `variant_class`: The classification of the variant (e.g., "Missense_Mutation").
-        * `disease`: The disease associated with the variant (e.g., "OSCC")
-        * For counting total records, use `variant_id` as the aggregation column.
-
-        **Your Task**
-        Your output MUST be a single JSON object with two keys:
-        1.  `table_name`: A string with the name of the database table, inferred from the query context.
-        2.  `request_body`: A JSON object containing the parameters that match the `AggregationRequest` model defined below.
-
-        **`request_body` Schema Definition**
-        * `column` (string): **(Required)** The primary column the user is asking about. If they ask to "show variant classes", the column is `variant_class`. If they ask "how many mutations", the column is `variant_id`.
-        * `aggregation_type` (string, optional, default: "count"): The type of aggregation. Use "count" for "how many" or when grouping distinct categories. Use "avg" for "average", etc.
-        * `group_by` (list of strings, optional): A list of columns to group the results by. This is used when the user asks for a breakdown "for each", "per", or "grouped by" a category.
-        * `filters` (dict, optional): Key-value pairs to filter data before aggregation. The value can be a string or a list of strings if multiple options are provided (e.g., {"gene": ["TP53", "BRCA1"]}).
-
-        ---
-        **Examples**
-
-        **User Query Context 1:** "How many SNP variants are in the TCGA dataset?"
-        **Your Response:**
-        {
-          "table_name": "es_tcga",
-          "request_body": {
-            "column": "variant_id",
-            "aggregation_type": "count",
-            "filters": {
-              "variant_type": "SNP"
-            }
-          }
-        }
-
-        **User Query Context 2:** "Show variant classes for TP53, BRCA1, and EGFR in the tcga dataset, grouped by variant class and gene."
-        **Your Response:**
-        {
-          "table_name": "es_tcga",
-          "request_body": {
-            "column": "variant_class",
-            "filters": {
-              "gene": [
-                "TP53",
-                "BRCA1",
-                "EGFR"
-              ]
-            },
-            "group_by": [
-              "variant_class",
-              "gene"
+        **3. Complex Filter Construction (CRITICAL)**
+        - **Structure**: ALL filters must be inside a `filters` object with `logic` (AND/OR) and `conditions` list
+        - **Single Condition**: Even one condition requires the full structure:
+        ```json
+          "filters": {{
+            "logic": "AND",
+            "conditions": [
+              {"column": "gene", "operator": "eq", "value": "TP53"}
             ]
-          }
-        }
+          }}
+        ```
+        - **Multiple Values for Same Column**: Use `"in"` operator with a list:
+        ```json
+          {{"column": "gene", "operator": "in", "value": ["BRCA1", "BRCA2", "TP53"]}}
+        ```
+        - **Multiple Columns**: Use multiple conditions with appropriate logic:
+        ```json
+          "filters": {{
+            "logic": "AND",
+            "conditions": [
+              {"column": "gene", "operator": "eq", "value": "TP53"},
+              {"column": "variant_type", "operator": "eq", "value": "SNP"}
+            ]
+          }}
+        ```
+        - **Operators**: 
+          - `"eq"`: exact match for single value
+          - `"in"`: match any value in a list
+          - `"like"`: partial/pattern matching (use sparingly)
+          - `"gt"`, `"lt"`, `"gte"`, `"lte"`: numeric comparisons
+
+        **4. Aggregation Types**
+        - `"count"`: Count all rows (use with variant_id for mutation counts)
+        - `"distinct_count"`: Count unique values (use with tumor_sample_barcode for patient counts)
+        - `"sum"`: Sum numeric values
+        - `"avg"`: Average of numeric values
+        - `"percentage"`: Calculate percentage (requires `percentage_by` field)
+        - `"min"`, `"max"`: Minimum/maximum values
+
+        **5. Grouping and Percentages**
+        - **group_by**: Use when you need results broken down by a category (e.g., by gene, by variant type)
+        - **percentage**: When user asks for "distribution", "share", "percentage of", or "breakdown":
+          - Set `aggregation_type: "percentage"`
+          - Set `percentage_by` to match the `group_by` field
+          - Example: percentage of mutations by gene → `"group_by": ["gene"], "percentage_by": "gene"`
+
+        **6. Query Context Parsing Rules**
+        The query_context will be in format: "Table: [table_name] | Request: [description]"
+        
+        Extract:
+        1. **Table Name**: From "Table: X" - use exact name from allowed list
+        2. **Intent**: What to count/aggregate (mutations vs patients)
+        3. **Filters**: Gene names, variant types, disease types, etc.
+        4. **Grouping**: If asking for breakdown/distribution
+        5. **Calculation**: Count, percentage, distinct count, etc.
+
+        {examples}
+
+        **8. Edge Cases and Error Handling**
+        - **Missing table name**: If not specified in query_context, default to first matching table or return error structure
+        - **Invalid table name**: Map to closest valid table or reject
+        - **No filters**: Valid - return aggregation without filters object
+        - **Ambiguous intent**: Prefer counting mutations (variant_id) over patients unless explicitly stated
+        - **Case sensitivity**: Always uppercase gene names, preserve case for other fields as given
+
+        **9. Validation Checklist (Self-Check Before Responding)**
+        Before outputting, verify:
+        ✓ table_name is one of the 4 allowed values
+        ✓ column name is valid (tumor_sample_barcode or variant_id for counts)
+        ✓ aggregation_type matches the intent
+        ✓ If filters exist, they have both "logic" and "conditions"
+        ✓ All gene names are UPPERCASE
+        ✓ "in" operator used for multiple values, "eq" for single values
+        ✓ If percentage, both group_by and percentage_by are present and match
+        ✓ No conversational text or explanations in output
+
+        **REMEMBER:**
+        - You are an INTERNAL processing agent - output ONLY structured JSON
+        - NEVER explain, apologize, or add conversational text
+        - ALWAYS return valid AggregationModel schema
+        - Make reasonable assumptions when query_context is ambiguous
+        - Default to counting mutations (variant_id) unless patients are explicitly mentioned
     """,
 )
