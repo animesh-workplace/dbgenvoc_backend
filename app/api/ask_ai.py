@@ -7,6 +7,7 @@ from app.agents.orchestrator import orchestrator_agent
 from app.agents.search import search_agent, SearchModel
 from app.agents.aggregate import aggregate_agent, AggregationModel
 from app.api.aggregate_combination import generic_concatenated_aggregate
+from langtrace_python_sdk.utils.with_root_span import with_langtrace_root_span
 from app.agents.synthesizer import preprocess_results_for_synthesis, synthesizer_agent
 from app.agents.concate_aggregate import (
     concate_aggregate_agent,
@@ -48,10 +49,8 @@ async def execute_api_call(
         )
 
 
+@with_langtrace_root_span()
 async def ask_database(query: str, db):
-    """
-    Query database using the full Plan -> Execute -> Synthesize workflow.
-    """
     specialists = {
         "generic_search": search_agent,
         "generic_aggregate": aggregate_agent,
@@ -63,44 +62,36 @@ async def ask_database(query: str, db):
         plan_response = orchestrator_agent.run(query)
         plan = plan_response.content
         print(plan)
+        print("--------")
     except (ValidationError, json.JSONDecodeError) as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"The orchestrator agent failed to generate a valid plan. Error: {str(e)}",
-        )
+        raise HTTPException(status_code=500, detail=f"Plan failed: {str(e)}")
 
     # --- 2. EXECUTE ---
     execution_results = []
+    conversational_notes = []  # Store agent insights here
+
     for step in plan.plan:
         tool_name = step.tool_name
         query_context = step.query_context
 
-        # --- NEW: HANDLE CONVERSATIONAL QUERIES ---
+        # HANDLE CONVERSATIONAL QUERIES WITHOUT EXITING
         if tool_name == "answer_conversational":
-            # If it's a simple conversation, just yield the friendly response and stop.
-            return {
-                "plan": plan,
-                "answer": step.query_context,
-                "data": [],
-                "results": execution_results,
-                "synthesis_prompt": [],
-            }
+            conversational_notes.append(query_context)
+            continue  # Move to the next step in the plan
 
         if tool_name not in specialists:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Orchestrator planned an unknown tool: '{tool_name}'",
-            )
+            # Optional: Log warning instead of hard fail if other tools exist
+            continue
 
         try:
             specialist_agent = specialists[tool_name]
             params_response = specialist_agent.run(query_context)
             params = params_response.content
-            print(f"Executing Tool: {tool_name} with Params: {params}")
+            print(params)
+            print("--------")
 
             result = await execute_api_call(tool_name, params, db)
 
-            # Important: Add tool_name to results for the pre-processor
             execution_results.append(
                 {
                     "result": result,
@@ -109,47 +100,45 @@ async def ask_database(query: str, db):
                     "context": query_context,
                 }
             )
-        except HTTPException as e:
-            raise HTTPException(
-                status_code=e.status_code,
-                detail=f"Error in step '{query_context}': {e.detail}",
-            )
         except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"An unexpected error occurred during execution: {str(e)}",
-            )
+            # Log error but consider if you want to continue with other steps
+            print(f"Error executing {tool_name}: {e}")
 
     # --- 3. SYNTHESIZE ---
-    if not execution_results:
-        return (
-            "I was able to create a plan, but no data was returned from the database."
-        )
 
-    # Pre-process the results to make them concise
+    # If no data and no notes, then we have nothing
+    if not execution_results and not conversational_notes:
+        return {"answer": "I couldn't find any information regarding your request."}
+
     summarized_data = preprocess_results_for_synthesis(execution_results)
-    print(f"Summarized Data for Synthesis:\n{json.dumps(summarized_data, indent=2)}\n")
 
+    # Inject BOTH data and conversational context into the prompt
     synthesis_prompt = f"""
         Original User Query: "{query}"
 
-        Data Results:
+        Context/Insights from Specialist:
+        {" ".join(conversational_notes)}
+
+        Database Results:
         {json.dumps(summarized_data)}
+
+        Please provide a final response that incorporates the data results and
+        addresses any limitations mentioned in the insights.
     """
+    print(synthesis_prompt)
+    print("--------")
 
     try:
         synthesis_response = synthesizer_agent.run(synthesis_prompt)
         final_answer = synthesis_response.content
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"The synthesizer agent failed to generate a final answer. Error: {str(e)}",
-        )
+        print(e)
+        raise HTTPException(status_code=500, detail="Synthesis failed.")
 
     return {
         "plan": plan,
         "answer": final_answer,
         "data": summarized_data,
+        "notes": conversational_notes,  # Helpful for frontend debugging
         "results": execution_results,
-        "synthesis_prompt": synthesis_prompt,
     }
