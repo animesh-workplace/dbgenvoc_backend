@@ -9,7 +9,7 @@ from app.agents.aggregate import aggregate_agent, AggregationModel
 from app.api.aggregate_combination import generic_concatenated_aggregate
 from langtrace_python_sdk.utils.with_root_span import with_langtrace_root_span
 from app.agents.synthesizer import preprocess_results_for_synthesis, synthesizer_agent
-from app.agents.concate_aggregate import (
+from app.agents.aggregate_combination import (
     concate_aggregate_agent,
     ConcatenatedAggregationModel,
 )
