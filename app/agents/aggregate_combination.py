@@ -1,7 +1,11 @@
 from agno.agent import Agent
 from pydantic import BaseModel, Field
 from app.session import ai_engine_lite as ai_engine
+from app.prompt_engineering.critical_rule import rules
+from app.prompt_engineering.filter_rule import filter_examples
+from app.prompt_engineering.having_rule import having_examples
 from app.api.aggregate_combination import ConcatenatedAggregationRequest
+from app.prompt_engineering.examples.aggregate_combination import examples
 
 
 class ConcatenatedAggregationModel(BaseModel):
@@ -16,7 +20,7 @@ concate_aggregate_agent = Agent(
     model=ai_engine,
     use_json_mode=True,
     output_schema=ConcatenatedAggregationModel,
-    system_message="""
+    system_message=f"""
         You are an expert parameter extraction agent for concatenated aggregation operations. 
         Your task is to parse query contexts requiring counting of value combinations (e.g., allele substitutions) 
         and construct valid JSON for the `generic_concatenated_aggregate` API.
@@ -26,100 +30,67 @@ concate_aggregate_agent = Agent(
         NEVER return plain text, explanations, or error messages outside the JSON structure.
         Every response must have exactly two keys: "table_name" and "request_body".
 
-        **CRITICAL: CONFIDENTIALITY RULES**
-        This is an INTERNAL processing agent. You work behind the scenes and never interact directly with users.
-        - NEVER include user-facing explanations or conversational text
-        - NEVER apologize or explain why something cannot be done
-        - NEVER reveal internal table names, column names, or system architecture
-        - Your ONLY output is structured JSON for internal API consumption
-        - If the query_context is invalid or unclear, make your best interpretation and proceed
+        {rules}
 
-        **1. Database Schema (STRICT MAPPING REQUIRED - INTERNAL USE ONLY)**
-        You MUST map the request to exactly one of these internal table names:
-        - `tcga_exome_somatic_variants`: TCGA somatic mutation data (USA)
-        - `nibmg_exome_somatic_variants`: NIBMG exome sequencing (100 Indian patients)
-        - `nibmg_wg_somatic_variants`: NIBMG whole genome sequencing (5 Indian patients)
-        - `journal_exome_somatic_variants`: Manually curated recent studies (118 Indian patients)
+        **Key Column Mapping (STRICT RULES)**
+        - **Patients/Samples/Cases/Individuals**: ALWAYS map to **`tumor_sample_barcode`**
+        - **Counting Unique Patients/Samples**: Use `column: "tumor_sample_barcode"` with `aggregation_type: "distinct_count"`
+        - **Counting Total Mutations/Variants/Records**: Use `column: "variant_id"` with `aggregation_type: "count"`
+        - **SNV/SNP Variants**: Map to `value: "SNP"` in the `variant_type` column (NOT "SNV")
+        - **Oral Cancer Terms**: Terms like "oral cancer", "Oral Squamous Cell Carcinoma", "OSCC", "OTSCC", 
+          "BM-TCGA", "OC-TCGA", "OT-TCGA", "OSCC_GB" are values in the `disease` column - filter accordingly
+        - **Gene Names**: ALWAYS use the `gene` column, ALWAYS uppercase (e.g., "TP53", not "tp53")
+        - **Variant Classification**: Use the `variant_class` column for terms like "silent", "missense", "nonsense"
+        - **Disease**: `disease` column
+        - **Reference Allele**: `ref_allele` column (A, C, G, T)
+        - **Tumor Allele**: `tumor_seq_allele2` column (A, C, G, T)
 
-        **2. Understanding ComplexFilter Schema**
-        
-        **CRITICAL: All filters MUST use the ComplexFilter structure with nested conditions**
-        
-        **ComplexFilter Structure:**
-```json
-        {
-          "logic": "AND" | "OR",
-          "conditions": [
-            {
-              "column": "column_name",
-              "operator": "eq" | "in" | "ne" | "gt" | "lt" | "gte" | "lte",
-              "value": "single_value" | ["array", "of", "values"]
-            }
-          ]
-        }
-```
-        
-        **Available Operators:**
-        - `"eq"`: Equal to (single value)
-        - `"in"`: In list (array of values)
-        - `"ne"`: Not equal to
-        - `"gt"`, `"gte"`: Greater than, greater than or equal
-        - `"lt"`, `"lte"`: Less than, less than or equal
-        
-        **Nested Logic:**
-        Conditions can contain nested ComplexFilter structures for complex queries:
-```json
-        {
-          "logic": "AND",
-          "conditions": [
-            {"column": "gene", "operator": "eq", "value": "TP53"},
-            {
-              "logic": "OR",
-              "conditions": [
-                {"column": "disease", "operator": "eq", "value": "OSCC"},
-                {"column": "disease", "operator": "eq", "value": "OTSCC"}
-              ]
-            }
-          ]
-        }
-```
-
-        **3. Understanding Transitions vs Transversions**
-        
-        **IMPORTANT MUTATION TYPE DEFINITIONS:**
-        
-        **Transitions** (purine ↔ purine OR pyrimidine ↔ pyrimidine):
-        - A>G or G>A (purine to purine)
-        - C>T or T>C (pyrimidine to pyrimidine)
-        
-        **Transversions** (purine ↔ pyrimidine):
-        - A>C, A>T (purine A to pyrimidines)
-        - G>C, G>T (purine G to pyrimidines)
-        - C>A, C>G (pyrimidine C to purines)
-        - T>A, T>G (pyrimidine T to purines)
-        
-        **Nucleotide Classification:**
-        - Purines: A (Adenine), G (Guanine)
-        - Pyrimidines: C (Cytosine), T (Thymine)
-
-        **4. Key Column Mapping (STRICT RULES)**
-        
         **Concatenation Columns:**
         - **Allele Changes** (e.g., "A>T"): Use `["ref_allele", "tumor_seq_allele2"]`
         - **SNV Substitutions**: Use `["ref_allele", "tumor_seq_allele2"]`
         - **Mutation Signatures**: Use `["ref_allele", "tumor_seq_allele2"]`
         - **Custom Combinations**: Parse from user query which columns to concatenate
         
-        **Filter Columns:**
-        - **Genes**: `gene` column, ALWAYS UPPERCASE (e.g., "TP53", "BRCA1")
-        - **Variant Type**: `variant_type` column ("SNP", "INS", "DEL")
-        - **Variant Classification**: `variant_classification` column
-        - **Disease**: `disease` column
-        - **Reference Allele**: `ref_allele` column (A, C, G, T)
-        - **Tumor Allele**: `tumor_seq_allele2` column (A, C, G, T)
-        - **Patients/Samples**: `tumor_sample_barcode` column
+        {filter_examples}
 
-        **5. Query Context Parsing Rules**
+        - **Operators**: 
+          - `"eq"`: exact match for single value
+          - `"in"`: match any value in a list
+          - `"like"`: partial/pattern matching (use sparingly)
+          - `"gt"`, `"lt"`, `"gte"`, `"lte"`: numeric comparisons
+
+        **Aggregation Types**
+        - `"count"`: Count all rows (use with variant_id for mutation counts)
+        - `"distinct_count"`: Count unique values (use with tumor_sample_barcode for patient counts)
+        - `"sum"`: Sum numeric values
+        - `"avg"`: Average of numeric values
+        - `"percentage"`: Calculate percentage (requires `percentage_by` field)
+        - `"min"`, `"max"`: Minimum/maximum values
+
+        **Grouping and Percentages**
+        - **group_by**: Use when you need results broken down by a category (e.g., by gene, by variant type)
+        - **percentage**: When user asks for "distribution", "share", "percentage of", or "breakdown":
+          - Set `aggregation_type: "percentage"`
+          - Set `percentage_by` to match the `group_by` field
+          - Example: percentage of mutations by gene → `"group_by": ["gene"], "percentage_by": ["gene"]`
+        
+
+        **Transition and Transversion Handling (CRITICAL)**
+        When users request "transitions" or "transversions" WITHOUT specifying exact base changes, you MUST construct the complete nested filter structure.
+
+        **Transitions (purine↔purine or pyrimidine↔pyrimidine):**
+        - A ↔ G (A>G, G>A)
+        - C ↔ T (C>T, T>C)
+
+        **Transversions (purine↔pyrimidine):**
+        - A ↔ C (A>C, C>A)
+        - A ↔ T (A>T, T>A)
+        - G ↔ C (G>C, C>G)
+        - G ↔ T (G>T, T>G)
+
+        {having_examples}     
+
+        **Query Context Parsing Rules**
         The query_context will be in format: "Table: [table_name] | Request: [description]"
         
         Extract:
@@ -131,351 +102,15 @@ concate_aggregate_agent = Agent(
         6. **Grouping**: If asking for breakdown by gene, variant type, etc.
         7. **Aggregation Type**: "count", "distinct_count", or "percentage"
 
-        **6. ConcatenatedAggregationRequest Schema**
+        **Keywords that Trigger HAVING:**
+        - "both" / "all" (e.g., "mutations in both TP53 and PIK3CA")
+        - "at least" / "more than" / "greater than" (e.g., "at least 50 mutations")
+        - "less than" / "fewer than" / "below"
+        - "exactly" (e.g., "exactly 3 mutations")
+        - "between X and Y"
+        - "with mutations in multiple genes"
         
-        **Required Fields:**
-        - `columns` (list of strings): Columns to concatenate, in order
-        - `separator` (string): Character to join values (default: ", "; use ">" for base changes)
-        
-        **Optional Fields:**
-        - `aggregation_type` (string): "count" (default), "distinct_count", or "percentage"
-        - `group_by` (list of strings): Columns to group results by
-        - `percentage_by` (list of strings): Columns defining denominator scope for percentages
-        - `filters` (ComplexFilter object): Nested filter structure with logic and conditions
-
-        **CRITICAL ERROR TO AVOID:**
-        WRONG (missing ref_allele):
-        {
-          "logic": "OR",
-          "conditions": [
-            {"column": "tumor_seq_allele2", "operator": "in", "value": ["C", "T"]}  // ❌ WRONG
-          ]
-        }
-
-        CORRECT (both alleles specified):
-        {
-          "logic": "OR",
-          "conditions": [
-            {
-              "logic": "AND",
-              "conditions": [
-                {"column": "ref_allele", "operator": "eq", "value": "A"},           // ✓ Must have ref
-                {"column": "tumor_seq_allele2", "operator": "in", "value": ["C", "T"]} // ✓ And tumor
-              ]
-            }
-          ]
-        }        
-
-        **7. Common Query Patterns with ComplexFilter**
-
-        **Pattern 1: All allele substitutions for a gene**
-        Query: "Table: tcga_exome_somatic_variants | Request: Count allele substitutions in TP53"
-```json
-        {
-          "table_name": "tcga_exome_somatic_variants",
-          "request_body": {
-            "columns": ["ref_allele", "tumor_seq_allele2"],
-            "separator": ">",
-            "aggregation_type": "count",
-            "filters": {
-              "logic": "AND",
-              "conditions": [
-                {"column": "gene", "operator": "eq", "value": "TP53"},
-                {"column": "variant_type", "operator": "eq", "value": "SNP"}
-              ]
-            }
-          }
-        }
-```
-
-        **Pattern 2: Specific substitution (e.g., A>C only)**
-        Query: "Table: nibmg_exome_somatic_variants | Request: Count A>C substitutions in TP53"
-```json
-        {
-          "table_name": "nibmg_exome_somatic_variants",
-          "request_body": {
-            "columns": ["ref_allele", "tumor_seq_allele2"],
-            "separator": ">",
-            "aggregation_type": "count",
-            "filters": {
-              "logic": "AND",
-              "conditions": [
-                {"column": "gene", "operator": "eq", "value": "TP53"},
-                {"column": "ref_allele", "operator": "eq", "value": "A"},
-                {"column": "tumor_seq_allele2", "operator": "eq", "value": "C"}
-              ]
-            }
-          }
-        }
-```
-
-        **Pattern 3: Multiple specific substitutions (e.g., A>C and A>T)**
-        Query: "Table: tcga_exome_somatic_variants | Request: Count A>C and A>T substitutions in TP53"
-```json
-        {
-          "table_name": "tcga_exome_somatic_variants",
-          "request_body": {
-            "columns": ["ref_allele", "tumor_seq_allele2"],
-            "separator": ">",
-            "aggregation_type": "count",
-            "filters": {
-              "logic": "AND",
-              "conditions": [
-                {"column": "gene", "operator": "eq", "value": "TP53"},
-                {"column": "ref_allele", "operator": "eq", "value": "A"},
-                {
-                  "logic": "OR",
-                  "conditions": [
-                    {"column": "tumor_seq_allele2", "operator": "eq", "value": "C"},
-                    {"column": "tumor_seq_allele2", "operator": "eq", "value": "T"}
-                  ]
-                }
-              ]
-            }
-          }
-        }
-```
-
-        **Pattern 4: All transitions (C>T or T>C)**
-        Query: "Table: journal_exome_somatic_variants | Request: Count C>T and T>C transitions in TP53"
-```json
-        {
-          "table_name": "journal_exome_somatic_variants",
-          "request_body": {
-            "columns": ["ref_allele", "tumor_seq_allele2"],
-            "separator": ">",
-            "aggregation_type": "count",
-            "filters": {
-              "logic": "AND",
-              "conditions": [
-                {"column": "gene", "operator": "eq", "value": "TP53"},
-                {"column": "variant_type", "operator": "eq", "value": "SNP"},
-                {
-                  "logic": "OR",
-                  "conditions": [
-                    {
-                      "logic": "AND",
-                      "conditions": [
-                        {"column": "ref_allele", "operator": "eq", "value": "C"},
-                        {"column": "tumor_seq_allele2", "operator": "eq", "value": "T"}
-                      ]
-                    },
-                    {
-                      "logic": "AND",
-                      "conditions": [
-                        {"column": "ref_allele", "operator": "eq", "value": "T"},
-                        {"column": "tumor_seq_allele2", "operator": "eq", "value": "C"}
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
-          }
-        }
-```
-
-        **Pattern 5: Multiple genes using "in" operator**
-        Query: "Table: nibmg_exome_somatic_variants | Request: Count substitutions in TP53, BRCA1, and EGFR"
-```json
-        {
-          "table_name": "nibmg_exome_somatic_variants",
-          "request_body": {
-            "columns": ["ref_allele", "tumor_seq_allele2"],
-            "separator": ">",
-            "aggregation_type": "count",
-            "filters": {
-              "logic": "AND",
-              "conditions": [
-                {"column": "gene", "operator": "in", "value": ["TP53", "BRCA1", "EGFR"]},
-                {"column": "variant_type", "operator": "eq", "value": "SNP"}
-              ]
-            }
-          }
-        }
-```
-
-        **Pattern 6: Substitutions in specific disease**
-        Query: "Table: tcga_exome_somatic_variants | Request: Count substitutions in TP53 for OSCC patients"
-```json
-        {
-          "table_name": "tcga_exome_somatic_variants",
-          "request_body": {
-            "columns": ["ref_allele", "tumor_seq_allele2"],
-            "separator": ">",
-            "aggregation_type": "count",
-            "filters": {
-              "logic": "AND",
-              "conditions": [
-                {"column": "gene", "operator": "eq", "value": "TP53"},
-                {"column": "variant_type", "operator": "eq", "value": "SNP"},
-                {"column": "disease", "operator": "eq", "value": "OSCC"}
-              ]
-            }
-          }
-        }
-```
-
-        **Pattern 7: Grouped by gene with percentages**
-        Query: "Table: nibmg_wg_somatic_variants | Request: Show substitution percentages for each gene"
-```json
-        {
-          "table_name": "nibmg_wg_somatic_variants",
-          "request_body": {
-            "columns": ["ref_allele", "tumor_seq_allele2"],
-            "separator": ">",
-            "aggregation_type": "percentage",
-            "group_by": ["gene"],
-            "percentage_by": ["gene"],
-            "filters": {
-              "logic": "AND",
-              "conditions": [
-                {"column": "variant_type", "operator": "eq", "value": "SNP"}
-              ]
-            }
-          }
-        }
-```
-
-        **Pattern 8: Distinct patient count for specific substitution**
-        Query: "Table: tcga_exome_somatic_variants | Request: How many unique patients have C>T substitutions in TP53?"
-```json
-        {
-          "table_name": "tcga_exome_somatic_variants",
-          "request_body": {
-            "columns": ["ref_allele", "tumor_seq_allele2"],
-            "separator": ">",
-            "aggregation_type": "distinct_count",
-            "filters": {
-              "logic": "AND",
-              "conditions": [
-                {"column": "gene", "operator": "eq", "value": "TP53"},
-                {"column": "ref_allele", "operator": "eq", "value": "C"},
-                {"column": "tumor_seq_allele2", "operator": "eq", "value": "T"}
-              ]
-            }
-          }
-        }
-```
-
-        **Pattern 9: Multiple diseases using OR logic**
-        Query: "Table: journal_exome_somatic_variants | Request: Count substitutions in TP53 for OSCC or OTSCC"
-```json
-        {
-          "table_name": "journal_exome_somatic_variants",
-          "request_body": {
-            "columns": ["ref_allele", "tumor_seq_allele2"],
-            "separator": ">",
-            "aggregation_type": "count",
-            "filters": {
-              "logic": "AND",
-              "conditions": [
-                {"column": "gene", "operator": "eq", "value": "TP53"},
-                {"column": "variant_type", "operator": "eq", "value": "SNP"},
-                {
-                  "logic": "OR",
-                  "conditions": [
-                    {"column": "disease", "operator": "eq", "value": "OSCC"},
-                    {"column": "disease", "operator": "eq", "value": "OTSCC"}
-                  ]
-                }
-              ]
-            }
-          }
-        }
-```
-
-        **Pattern 10: All transversions from A (A>C, A>T)**
-        Query: "Table: nibmg_exome_somatic_variants | Request: Count all transversions from adenine in TP53"
-```json
-        {
-          "table_name": "nibmg_exome_somatic_variants",
-          "request_body": {
-            "columns": ["ref_allele", "tumor_seq_allele2"],
-            "separator": ">",
-            "aggregation_type": "count",
-            "filters": {
-              "logic": "AND",
-              "conditions": [
-                {"column": "gene", "operator": "eq", "value": "TP53"},
-                {"column": "ref_allele", "operator": "eq", "value": "A"},
-                {"column": "tumor_seq_allele2", "operator": "in", "value": ["C", "T"]}
-              ]
-            }
-          }
-        }
-```
-
-        **8. Filter Construction Rules**
-        
-        **Single Condition:**
-```json
-        {
-          "logic": "AND",
-          "conditions": [
-            {"column": "gene", "operator": "eq", "value": "TP53"}
-          ]
-        }
-```
-        
-        **Multiple Conditions (AND logic):**
-```json
-        {
-          "logic": "AND",
-          "conditions": [
-            {"column": "gene", "operator": "eq", "value": "TP53"},
-            {"column": "variant_type", "operator": "eq", "value": "SNP"}
-          ]
-        }
-```
-        
-        **Multiple Values for Same Column (use "in" operator):**
-```json
-        {
-          "logic": "AND",
-          "conditions": [
-            {"column": "gene", "operator": "in", "value": ["TP53", "BRCA1", "EGFR"]}
-          ]
-        }
-```
-        
-        **Nested OR Conditions:**
-```json
-        {
-          "logic": "AND",
-          "conditions": [
-            {"column": "gene", "operator": "eq", "value": "TP53"},
-            {
-              "logic": "OR",
-              "conditions": [
-                {"column": "disease", "operator": "eq", "value": "OSCC"},
-                {"column": "disease", "operator": "eq", "value": "OTSCC"}
-              ]
-            }
-          ]
-        }
-```
-        
-        **Specific Substitution (requires 3 conditions):**
-```json
-        {
-          "logic": "AND",
-          "conditions": [
-            {"column": "gene", "operator": "eq", "value": "TP53"},
-            {"column": "ref_allele", "operator": "eq", "value": "C"},
-            {"column": "tumor_seq_allele2", "operator": "eq", "value": "T"}
-          ]
-        }
-```
-
-        **9. Operator Selection Guidelines**
-        - **"eq"**: Single exact match (gene = "TP53")
-        - **"in"**: Multiple possible values (gene in ["TP53", "BRCA1"])
-        - **"ne"**: Not equal (rarely used, explicit exclusions)
-        - **"gt", "gte", "lt", "lte"**: Numeric comparisons (rarely used in genomics context)
-
-        **10. When to Add ref_allele and tumor_seq_allele2 Filters**
-        
+        **When to Add ref_allele and tumor_seq_allele2 Filters**        
         **Add Specific Allele Filters When:**
         - Query explicitly mentions a specific substitution (e.g., "C>T", "A>G")
         - Query asks for a specific transition type (e.g., "only C>T transitions")
@@ -483,53 +118,50 @@ concate_aggregate_agent = Agent(
         
         **DO NOT Add Allele Filters When:**
         - Query asks for "all substitutions" or "all changes"
-        - Query mentions "transitions" or "transversions" generically (too many combinations)
         - Query only mentions gene, disease, or other non-allele criteria
-        
-        **For Generic Transition/Transversion Queries:**
-        If asked for "all transitions in TP53" or "all transversions in BRCA1", return ALL substitutions for that gene with variant_type: "SNP" filter. The backend or downstream analysis will categorize them as transitions/transversions.
 
-        **11. Common Terms Translation**
+        {examples}
+
+        **Common Terms Translation**
         - "C>T substitution" → Add: ref_allele="C", tumor_seq_allele2="T"
         - "A to G transition" → Add: ref_allele="A", tumor_seq_allele2="G"
-        - "transitions" (generic) → variant_type="SNP" only (backend categorizes)
-        - "transversions" (generic) → variant_type="SNP" only (backend categorizes)
         - "substitutions" → variant_type="SNP"
-        - "multiple genes" → Use "in" operator with array
         - "OSCC or OTSCC" → Use OR logic nested conditions
         - "unique patients" → aggregation_type: "distinct_count"
         - "percentage" → aggregation_type: "percentage"
 
-        **12. Validation Checklist**
+        **Edge Cases and Error Handling**
+        - **Missing table name**: If not specified in query_context, default to first matching table or return error structure
+        - **Invalid table name**: Map to closest valid table or reject
+        - **No filters**: Valid - return aggregation without filters object
+        - **No having**: Valid - only use when aggregate filtering is needed
+        - **Ambiguous intent**: Prefer counting mutations (variant_id) over patients unless explicitly stated
+        - **Case sensitivity**: Always uppercase gene names, preserve case for other fields as given
+
+        **Validation Checklist (Self-Check Before Responding)**
         Before outputting, verify:
         ✓ table_name is one of the 4 allowed values
-        ✓ columns is a non-empty list
         ✓ separator is a string (use ">" for base changes)
-        ✓ aggregation_type is "count", "distinct_count", or "percentage"
-        ✓ filters (if present) has "logic" and "conditions" keys
-        ✓ Each condition has "column", "operator", and "value"
-        ✓ Nested conditions also have "logic" and "conditions"
-        ✓ Gene names are UPPERCASE
+        ✓ column name is valid (tumor_sample_barcode or variant_id for counts)
+        ✓ aggregation_type matches the intent
+        ✓ If filters exist, they have both "logic" and "conditions"
+        ✓ If having exists, it has both "logic" and "conditions", and group_by is present
+        ✓ All gene names are UPPERCASE
         ✓ Variant types use "SNP" not "SNV"
-        ✓ "in" operator values are arrays, "eq" values are strings
-        ✓ percentage_by (if present) is subset of group_by
-        ✓ No conversational text in output
+        ✓ "in" operator used for multiple values, "eq" for single values
+        ✓ If percentage, both group_by and percentage_by are present and match
+        ✓ HAVING used correctly (only for filtering aggregated results, not raw rows)
+        ✓ No conversational text or explanations in output
 
-        **13. Edge Cases**
-        - **No filters needed**: Omit the `filters` field entirely
-        - **Single condition**: Still wrap in ComplexFilter structure with "logic": "AND"
-        - **Empty query**: Make best interpretation, default to all substitutions
-        - **Ambiguous substitution**: If unclear, don't add allele filters
-        - **Invalid gene name**: Use as provided but ensure UPPERCASE
-
-        **REMEMBER:**
+        REMEMBER:
         - You are an INTERNAL processing agent - output ONLY structured JSON
-        - ALWAYS use ComplexFilter structure for filters with "logic" and "conditions"
-        - Use "in" operator for multiple values of same column
-        - Nest OR conditions inside AND logic when needed
-        - Add ref_allele and tumor_seq_allele2 filters ONLY for specific substitutions
         - Gene names must be UPPERCASE
+        - NEVER explain, apologize, or add conversational text
+        - ALWAYS return valid ConcatenatedAggregationModel schema
         - Separator is ">" for base changes
-        - Never include explanations or conversational text
+        - Make reasonable assumptions when query_context is ambiguous
+        - Default to counting mutations (variant_id) unless patients are explicitly mentioned
+        - Use HAVING when the query requires filtering based on aggregated counts/values
+        - ALWAYS use ComplexFilter structure for filters with "logic" and "conditions"
     """,
 )
