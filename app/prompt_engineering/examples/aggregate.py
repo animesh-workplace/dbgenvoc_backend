@@ -239,4 +239,99 @@ Query: "Table: tcga_exome_somatic_variants | Request: Count TP53 mutations in OS
     }
 }
 ```
+
+**Example 7: HAVING - Patients with mutations in BOTH genes**
+Query: "Table: tcga_exome_somatic_variants | Request: Find patients with mutations in both TP53 and PIK3CA"
+```json
+{
+    "table_name": "tcga_exome_somatic_variants",
+    "request_body": {
+        "column": "gene",
+        "aggregation_type": "distinct_count",
+        "group_by": ["tumor_sample_barcode"],
+        "filters": {
+            "logic": "AND",
+            "conditions": [
+                {"column": "gene", "operator": "in", "value": ["TP53", "PIK3CA"]}
+            ]
+        },
+        "having": {
+            "logic": "AND",
+            "conditions": [
+                {"operator": "eq", "value": 2}
+            ]
+        }
+    }
+}
+```
+
+**Example 8: HAVING - Patients with more than X mutations in specific gene**
+Query: "Table: tcga_exome_somatic_variants | Request: Find patients with more than 5 TP53 mutations (use HAVING: count > 5)"
+```json
+{
+    "table_name": "tcga_exome_somatic_variants",
+    "request_body": {
+        "column": "variant_id",
+        "aggregation_type": "count",
+        "group_by": ["tumor_sample_barcode"],
+        "filters": {
+            "logic": "AND",
+            "conditions": [
+                {"column": "gene", "operator": "eq", "value": "TP53"}
+            ]
+        },
+        "having": {
+            "logic": "AND",
+            "conditions": [
+                {"operator": "gt", "value": 5}
+            ]
+        }
+    }
+}
+```
+
+**Example 9: HAVING - Range filtering**
+Query: "Table: journal_exome_somatic_variants | Request: Show genes with mutation counts between 10 and 100 (use HAVING: count >= 10 AND count <= 100)"
+```json
+{
+    "table_name": "journal_exome_somatic_variants",
+    "request_body": {
+        "column": "variant_id",
+        "aggregation_type": "count",
+        "group_by": ["gene"],
+        "having": {
+            "logic": "AND",
+            "conditions": [
+                {"operator": "gte", "value": 10},
+                {"operator": "lte", "value": 100}
+            ]
+        }
+    }
+}
+```
+
+**Example 10: HAVING - Multiple genes co-occurrence**
+Query: "Table: nibmg_wg_somatic_variants | Request: Find patients with mutations in at least 3 of: TP53, PIK3CA, NOTCH1, BRCA1 (use HAVING to filter for atleast 3 distinct genes)"
+```json
+{
+    "table_name": "nibmg_wg_somatic_variants",
+    "request_body": {
+        "column": "gene",
+        "aggregation_type": "distinct_count",
+        "group_by": ["tumor_sample_barcode"],
+        "filters": {
+            "logic": "AND",
+            "conditions": [
+                {"column": "gene", "operator": "in", "value": ["TP53", "PIK3CA", "NOTCH1", "BRCA1"]}
+            ]
+        },
+        "having": {
+            "logic": "AND",
+            "conditions": [
+                {"operator": "gte", "value": 3}
+            ]
+        }
+    }
+}
+```
 """
