@@ -1,15 +1,16 @@
 from enum import Enum
-from sqlalchemy import func
 from fastapi import HTTPException
-from pydantic import BaseModel, Field
-from app.schema_new import ComplexFilter
+from sqlalchemy import func, and_, or_
 from typing import Any, Dict, List, Optional, Union
+from pydantic import BaseModel, Field, field_validator
+from app.schema_new import ComplexFilter, HavingClause, HavingCondition
 from app.core import (
     apply_filters,
     get_model_class,
     validate_columns,
     _build_filter_expression,
 )
+
 
 # ==========================================
 #               SCHEMAS
@@ -35,13 +36,37 @@ class ConcatenatedAggregationRequest(BaseModel):
     )
 
     filters: Optional[ComplexFilter] = Field(
-        None, description="Filters to apply before concatenation"
+        None,
+        description="Filters to apply before concatenation (applied before GROUP BY)",
     )
 
     aggregation_type: AggregationType = Field(
         AggregationType.count,
-        description="Type of aggregation (count or distinct_count)",
+        description="Type of aggregation (count, percentage, or distinct_count)",
     )
+
+    having: Optional[HavingClause] = Field(
+        None,
+        description="HAVING clause to filter aggregated results (applied after GROUP BY)",
+    )
+
+    @field_validator("having")
+    @classmethod
+    def validate_having_requires_group_by(cls, v, info):
+        if v is not None and not info.data.get("group_by"):
+            raise ValueError("HAVING clause requires group_by to be specified")
+        return v
+
+    @field_validator("percentage_by")
+    @classmethod
+    def validate_percentage_by(cls, v, info):
+        if v:
+            group_by = info.data.get("group_by")
+            if not group_by or not set(v).issubset(set(group_by)):
+                raise ValueError(
+                    "percentage_by columns must be present in group_by columns"
+                )
+        return v
 
 
 class AggregationResponse(BaseModel):
@@ -49,11 +74,58 @@ class AggregationResponse(BaseModel):
     table_name: str
     total_records: int
     aggregation_type: str
+    having_applied: bool = False  # Whether HAVING clause was used
+    groups_after_having: Optional[int] = None  # Number of groups after HAVING
+    groups_before_having: Optional[int] = None  # Number of groups before HAVING
 
     # New Key: Group Totals
     group_totals: Optional[Dict[str, int]] = None
 
     result: Union[Dict[str, Any], List[Dict[str, Any]]]
+
+
+# ==========================================
+#           INTERNAL HELPERS
+# ==========================================
+
+
+def _build_having_filter(having_clause: HavingClause, agg_expr):
+    """
+    Recursively builds SQLAlchemy HAVING conditions.
+
+    Args:
+        having_clause: The HavingClause to process
+        agg_expr: The aggregation expression to apply conditions to
+
+    Returns:
+        SQLAlchemy BinaryExpression for HAVING clause
+    """
+    conditions = []
+
+    for condition in having_clause.conditions:
+        if isinstance(condition, HavingCondition):
+            # Base case: single condition
+            if condition.operator == "eq":
+                conditions.append(agg_expr == condition.value)
+            elif condition.operator == "neq":
+                conditions.append(agg_expr != condition.value)
+            elif condition.operator == "gt":
+                conditions.append(agg_expr > condition.value)
+            elif condition.operator == "gte":
+                conditions.append(agg_expr >= condition.value)
+            elif condition.operator == "lt":
+                conditions.append(agg_expr < condition.value)
+            elif condition.operator == "lte":
+                conditions.append(agg_expr <= condition.value)
+        else:
+            # Recursive case: nested HavingClause
+            conditions.append(_build_having_filter(condition, agg_expr))
+
+    # Combine with appropriate logic
+    if having_clause.logic == "AND":
+        return and_(*conditions)
+    else:  # OR
+        return or_(*conditions)
 
 
 # ==========================================
@@ -66,7 +138,14 @@ async def generic_concatenated_aggregate(
 ) -> AggregationResponse:
     """
     Concatenates values from multiple columns (e.g., "Ref>Alt") and aggregates them.
-    Supports Scoped Percentages (percentage_by) and Group Totals.
+    Supports Scoped Percentages (percentage_by), Group Totals, and HAVING clause.
+
+    Query execution order:
+    1. FROM table_name
+    2. WHERE (filters)
+    3. GROUP BY (group_by + concatenated_value)
+    4. HAVING (having clause on aggregated results)
+    5. SELECT (final result)
     """
     try:
         model_class = get_model_class(table_name)
@@ -88,13 +167,6 @@ async def generic_concatenated_aggregate(
 
         if request.percentage_by:
             validate_columns(model_class, request.percentage_by)
-            if not request.group_by or not set(request.percentage_by).issubset(
-                set(request.group_by)
-            ):
-                raise HTTPException(
-                    status_code=400,
-                    detail="percentage_by columns must be present in group_by columns",
-                )
 
         # 2. Build Concatenated Expression (with NULL Safety)
         col_attrs = [getattr(model_class, col) for col in request.columns]
@@ -104,16 +176,19 @@ async def generic_concatenated_aggregate(
                 concatenated_col, request.separator, func.coalesce(col_attrs[i], "")
             )
 
-        # 3. Base Query & Filters (Calculate Total Records)
+        # 3. Base Query & Apply WHERE Filters
         query = db.query(model_class)
         query = apply_filters(query, model_class, request.filters)
 
+        # 4. Capture Total Records (After WHERE, Before GROUP BY)
         total_records = query.count()
 
-        # 4. Aggregation Logic
+        # 5. Aggregation Logic
         formatted_results = []
         final_result = None
         group_totals_map = {}
+        groups_before_having = None
+        groups_after_having = None
 
         # Re-build filter expression for the specific aggregation query
         filter_expr = (
@@ -123,7 +198,7 @@ async def generic_concatenated_aggregate(
         )
 
         if request.group_by:
-            # --- Group By + Concatenation ---
+            # === GROUPED AGGREGATION WITH CONCATENATION ===
             group_attrs = [getattr(model_class, c) for c in request.group_by]
             extra_selects = []
 
@@ -136,47 +211,35 @@ async def generic_concatenated_aggregate(
                     and request.percentage_by
                 ):
                     # --- SCOPED PERCENTAGE (Window Function) ---
-                    # Denominator = Sum of counts (1 per row for concat string), partitioned by percentage_by
                     partition_attrs = [
                         getattr(model_class, c) for c in request.percentage_by
                     ]
-
-                    # Note: We are counting occurrences of the concatenated string.
-                    # Since we group by (GroupCols + ConcatString), count(*) gives the numerator.
-                    # To get the denominator (Group Total), we sum that count over the partition.
-
-                    # Logic:
-                    # 1. Group by [Disease, ConcatStr] -> Count = 20 (Numerator)
-                    # 2. Window Sum over [Disease] -> Sum(20, 30, ...) = 500 (Denominator)
-
-                    # However, standard SQL aggregate-window mixing can be tricky.
-                    # A cleaner way in SQLAlchemy ORM for this specific combo pattern:
-                    # We usually need a subquery or strict windowing.
-
-                    # SIMPLIFIED APPROACH:
-                    # Since we are already grouping by (GroupAttrs + Concat), we can't easily window over just GroupAttrs
-                    # in the same query level in all SQL dialects without a subquery.
-
-                    # BUT, for standard Postgres/MySQL 8+, we can do:
-                    # sum(count(concat_col)) OVER (PARTITION BY partition_attrs)
 
                     denominator = func.sum(func.count(concatenated_col)).over(
                         partition_by=partition_attrs
                     )
                     count_col = func.count(concatenated_col)
 
+                    # For HAVING, we use the count expression
+                    agg_expr = count_col
+
                     extra_selects = [
                         count_col.label("count"),
                         denominator.label("group_total"),
                     ]
-
-                    # Note: We calculate percentage in Python loop to be safe with float division types across DBs
+                elif request.aggregation_type == AggregationType.percentage:
+                    # --- GLOBAL PERCENTAGE ---
+                    count_col = func.count(concatenated_col)
+                    agg_expr = count_col
+                    extra_selects = [count_col.label("count")]
                 else:
-                    # Standard Count or Global Percentage
-                    extra_selects = [func.count(concatenated_col).label("count")]
+                    # Standard Count
+                    count_col = func.count(concatenated_col)
+                    agg_expr = count_col
+                    extra_selects = [count_col.label("count")]
 
-                # Build Query
-                agg_query = (
+                # Build Grouped Query
+                grouped_query = (
                     db.query(
                         *group_attrs,
                         concatenated_col.label("concatenated_value"),
@@ -186,7 +249,21 @@ async def generic_concatenated_aggregate(
                     .group_by(*group_attrs, concatenated_col)
                 )
 
-                results = agg_query.all()
+                # Count groups before HAVING
+                groups_before_having = (
+                    db.query(func.count())
+                    .select_from(grouped_query.subquery())
+                    .scalar()
+                )
+
+                # Apply HAVING clause if present
+                if request.having:
+                    having_filter = _build_having_filter(request.having, agg_expr)
+                    grouped_query = grouped_query.having(having_filter)
+
+                # Execute Query
+                results = grouped_query.all()
+                groups_after_having = len(results)
 
                 # Indices Helper for percentage_by
                 pct_indices = []
@@ -206,9 +283,6 @@ async def generic_concatenated_aggregate(
                     item["concatenated_value"] = res[concat_idx]
 
                     # 3. Extract Count and Total
-                    # If Scoped %, we have count at +1 and total at +2
-                    # If Standard, we have count at +1
-
                     count_val = res[concat_idx + 1]
 
                     if request.aggregation_type == AggregationType.percentage:
@@ -242,19 +316,33 @@ async def generic_concatenated_aggregate(
                 final_result = formatted_results
 
             elif request.aggregation_type == AggregationType.distinct_count:
-                # Distinct count logic (rarely used with percentage_by in this context)
-                agg_query = (
+                # Distinct count logic
+                agg_expr = func.count(func.distinct(concatenated_col))
+
+                grouped_query = (
                     db.query(
                         *group_attrs,
-                        func.count(func.distinct(concatenated_col)).label(
-                            "distinct_cnt"
-                        ),
+                        agg_expr.label("distinct_cnt"),
                     )
                     .filter(filter_expr)
                     .group_by(*group_attrs)
                 )
 
-                results = agg_query.all()
+                # Count groups before HAVING
+                groups_before_having = (
+                    db.query(func.count())
+                    .select_from(grouped_query.subquery())
+                    .scalar()
+                )
+
+                # Apply HAVING clause if present
+                if request.having:
+                    having_filter = _build_having_filter(request.having, agg_expr)
+                    grouped_query = grouped_query.having(having_filter)
+
+                results = grouped_query.all()
+                groups_after_having = len(results)
+
                 for res in results:
                     item = {}
                     for i, g_col in enumerate(request.group_by):
@@ -266,21 +354,35 @@ async def generic_concatenated_aggregate(
                 final_result = formatted_results
 
         else:
-            # --- No Grouping (Global Distribution) ---
+            # === NO GROUPING (Global Distribution) ===
             if request.aggregation_type in [
                 AggregationType.count,
                 AggregationType.percentage,
             ]:
+                count_col = func.count(concatenated_col)
+
                 agg_query = (
                     db.query(
                         concatenated_col.label("concatenated_value"),
-                        func.count(concatenated_col).label("count"),
+                        count_col.label("count"),
                     )
                     .filter(filter_expr)
                     .group_by(concatenated_col)
                 )
 
+                # Count groups before HAVING
+                groups_before_having = (
+                    db.query(func.count()).select_from(agg_query.subquery()).scalar()
+                )
+
+                # Apply HAVING clause if present
+                if request.having:
+                    having_filter = _build_having_filter(request.having, count_col)
+                    agg_query = agg_query.having(having_filter)
+
                 results = agg_query.all()
+                groups_after_having = len(results)
+
                 for row in results:
                     count_val = row.count
                     if request.aggregation_type == AggregationType.percentage:
@@ -315,18 +417,23 @@ async def generic_concatenated_aggregate(
                 )
                 final_result = {"value": cnt}
 
-        # 5. Return Response
+        # 6. Return Response
         return AggregationResponse(
             table_name=table_name,
             column="+".join(request.columns),
             aggregation_type=request.aggregation_type.value,
             result=final_result,
             total_records=total_records,
+            groups_before_having=groups_before_having,
+            groups_after_having=groups_after_having,
+            having_applied=request.having is not None,
             group_totals=group_totals_map if group_totals_map else None,
         )
 
     except HTTPException as he:
         raise he
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Concatenated aggregation failed: {str(e)}"
