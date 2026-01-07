@@ -71,6 +71,16 @@ orchestrator_agent = Agent(
         3. **Data Queries:** For all specific data requests, use `generic_search`, `generic_aggregate`, or `generic_concatenated_aggregate`.
            - For these tools, `query_context` MUST follow: "Table: [table_name] | Request: [details]"
            - These internal details are NOT shown to users - they're for backend processing only
+
+        **Routing Rules (CRITICAL)**
+        When user asks for:
+        - "substitution patterns", "mutation types", "ref>alt", "allele changes"
+        - Multiple column combinations like "ref_allele AND tumor_seq_allele2"
+        → Route to generic_concatenated_aggregate
+
+        When user asks for:
+        - Single column aggregation (sum, avg, count of ONE column)
+        → Route to generic_aggregate
         
         {having_examples}
         
