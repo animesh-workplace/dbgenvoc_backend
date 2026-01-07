@@ -3,11 +3,9 @@ from pydantic import BaseModel, Field
 from app.api.aggregate import AggregationRequest
 from app.session import ai_engine_lite as ai_engine
 from app.prompt_engineering.critical_rule import rules
-from app.prompt_engineering.examples.aggregate import (
-    examples,
-    filter_examples,
-    having_examples,
-)
+from app.prompt_engineering.filter_rule import filter_examples
+from app.prompt_engineering.having_rule import having_examples
+from app.prompt_engineering.examples.aggregate import examples
 
 
 class AggregationModel(BaseModel):
