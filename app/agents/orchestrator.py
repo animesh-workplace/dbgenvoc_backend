@@ -3,7 +3,7 @@ from agno.agent import Agent
 from pydantic import BaseModel, Field
 from app.session import ai_engine_pro as ai_engine
 from app.prompt_engineering.critical_rule import rules
-from app.prompt_engineering.examples.orchestrator import examples
+from app.prompt_engineering.examples.orchestrator import examples, having_examples
 
 
 class PlanStep(BaseModel):
@@ -52,7 +52,7 @@ orchestrator_agent = Agent(
         1. generic_search: Use to find and retrieve data rows.
             Capabilities: Supports complex, nested AND/OR logic via ComplexFilter. Can filter on multiple values for the same field in a single call (e.g., search for genes 'BRCA1' and 'TP53' at once).
         2. generic_aggregate: Use to calculate summary statistics (Count, Sum, Avg, Percentage, etc.) on a single column.
-            Capabilities: Can group results by one or more columns. Supports scoped percentage calculations using percentage_by to calculate share relative to a group total. Returns a group_totals object containing denominators for each group.
+            Capabilities: Can group results by one or more columns. Supports scoped percentage calculations using percentage_by to calculate share relative to a group total. Returns a group_totals object containing denominators for each group. Supports HAVING clause for filtering aggregated results (e.g., finding patients with mutations in BOTH gene X and Y).
         3. generic_concatenated_aggregate: Use to count combinations of values from multiple columns.
             Capabilities: Primarily used for counting transitions/transversions between two states (e.g., SNV classes like A>G). Handles NULL values safely during concatenation. Supports the same grouping, percentage_by, and group_totals logic as the standard aggregate tool.
         4. answer_conversational: Use for non-data queries (greetings, identity questions, capability explanations, help requests).
@@ -72,10 +72,13 @@ orchestrator_agent = Agent(
            - For these tools, `query_context` MUST follow: "Table: [table_name] | Request: [details]"
            - These internal details are NOT shown to users - they're for backend processing only
         
+        {having_examples}
+        
         **Consolidation Rules (CRITICAL):**
         1. **ONE STEP PER TABLE**: If a user asks for multiple genes (e.g., TP53 and FAT1) for a specific table, create exactly ONE `PlanStep` for that table.
         2. **NO ATOMIC SPLITTING**: Never split a query into separate steps for individual genes. The tools are designed to handle lists in a single call.
         3. **NO UNSOLICITED STEPS**: Do not add "total mutation counts" or summary steps unless explicitly requested.
+        4. **HAVING REQUIRES SINGLE STEP**: If HAVING is needed, it must be in a single consolidated step, not split across multiple steps.
         
         **SCHEMA COMPLIANCE (ABSOLUTE REQUIREMENTS):**
         - ALWAYS return valid JSON with a "plan" key containing an array of PlanStep objects
@@ -90,5 +93,6 @@ orchestrator_agent = Agent(
         1. Your ONLY job is to return a valid JSON plan. Never break format, even for conversational queries.
         2. NEVER reveal internal table names, tool names, or technical implementation details in conversational responses.
         3. Keep user-facing descriptions simple and focused on capabilities, not implementation.
+        4. ALWAYS explicitly indicate in query_context when HAVING should be used by the aggregate agent.
     """,
 )
