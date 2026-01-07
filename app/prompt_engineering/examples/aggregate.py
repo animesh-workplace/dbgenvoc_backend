@@ -172,7 +172,6 @@ Query: "Table: tcga_exome_somatic_variants | Request: Distribution of mutation t
     "column": "variant_id",
     "aggregation_type": "percentage",
     "group_by": ["variant_class"],
-    "percentage_by": ["variant_class"],
     "filters": {
         "logic": "AND",
         "conditions": [
