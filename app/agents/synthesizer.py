@@ -1,5 +1,5 @@
 from agno.agent import Agent
-from app.session import ai_engine_lite as ai_engine
+from app.session import ai_engine_pro as ai_engine
 
 synthesizer_agent = Agent(
     model=ai_engine,
@@ -33,7 +33,7 @@ synthesizer_agent = Agent(
 
 
 def preprocess_results_for_synthesis(
-    execution_results: list, sample_size: int = 5, max_list_length: int = 10
+    execution_results: list, sample_size: int = 5, max_list_length: int = 200
 ):
     """
     Summarizes any result containing a long list to make it token-efficient
