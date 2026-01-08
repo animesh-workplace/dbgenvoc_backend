@@ -3,7 +3,11 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from agno.models.aws import AwsBedrock
 from langtrace_python_sdk import langtrace
+from agno.models.nvidia import Nvidia
+from agno.models.groq import Groq
+from agno.models.openai import OpenAILike
 from sqlalchemy.orm import registry, sessionmaker
+from agno.models.google import Gemini
 # from sqlalchemy.ext.declarative import declarative_base
 
 load_dotenv()
@@ -19,6 +23,19 @@ engine = create_engine(
     if "sqlite" in SQLALCHEMY_DATABASE_URL
     else {},
 )
+
+ai_engine_open = Nvidia(
+    id="moonshotai/kimi-k2-instruct", api_key=os.getenv("NVIDIA_KEY")
+)
+
+# ai_engine_open = Gemini(id="gemini-3-flash", api_key=os.getenv("GOOGLE_KEY"))
+# ai_engine_open = OpenAILike(
+#     id="google/gemma-3-27b-instruct/bf-16",
+#     api_key=os.getenv("INFERENCE_KEY"),
+#     base_url="https://api.inference.net/v1",
+# )
+
+# ai_engine_open = Groq(id="groq/compound", api_key=os.getenv("GROQ_KEY"))
 
 ai_engine_pro = AwsBedrock(
     id=os.getenv("AMAZON_MODEL_ID_PRO"),
