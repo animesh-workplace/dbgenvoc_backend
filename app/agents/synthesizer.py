@@ -1,7 +1,8 @@
 from agno.agent import Agent
-from app.session import ai_engine_pro as ai_engine
+from app.session import ai_engine_reason as ai_engine
 
 synthesizer_agent = Agent(
+    markdown=True,
     model=ai_engine,
     system_message="""
         You are OSCAR (Oral Squamous Carcinoma Analytical Research), a professional bioinformatician and data interpreter. 
@@ -33,7 +34,7 @@ synthesizer_agent = Agent(
 
 
 def preprocess_results_for_synthesis(
-    execution_results: list, sample_size: int = 5, max_list_length: int = 200
+    execution_results: list, sample_size: int = 5, max_list_length: int = 20000
 ):
     """
     Summarizes any result containing a long list to make it token-efficient
