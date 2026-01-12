@@ -1,7 +1,7 @@
 from typing import List
 from agno.agent import Agent
 from pydantic import BaseModel, Field
-from app.session import ai_engine_pro as ai_engine
+from app.session import ai_engine_reason as ai_engine
 from app.prompt_engineering.critical_rule import rules
 from app.prompt_engineering.examples.orchestrator import examples, having_examples
 
