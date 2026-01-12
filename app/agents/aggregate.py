@@ -1,7 +1,7 @@
 from agno.agent import Agent
 from pydantic import BaseModel, Field
 from app.api.aggregate import AggregationRequest
-from app.session import ai_engine_lite as ai_engine
+from app.session import ai_engine_reason as ai_engine
 from app.prompt_engineering.critical_rule import rules
 from app.prompt_engineering.filter_rule import filter_examples
 from app.prompt_engineering.having_rule import having_examples
@@ -42,7 +42,7 @@ aggregate_agent = Agent(
         - **Oral Cancer Terms**: Terms like "oral cancer", "Oral Squamous Cell Carcinoma", "OSCC", "OTSCC", 
           "BM-TCGA", "OC-TCGA", "OT-TCGA", "OSCC_GB" are values in the `disease` column - filter accordingly
         - **Gene Names**: ALWAYS use the `gene` column, ALWAYS uppercase (e.g., "TP53", not "tp53")
-        - **Variant Classification**: Use the `variant_class` column for terms like "silent", "missense", "nonsense"
+        - **Variant Classification**: Use the `variant_class` column for terms like "Silent", "Missense", "Nonsense"
 
         {filter_examples}
 
