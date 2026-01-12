@@ -1,11 +1,12 @@
 from app.session import get_db
 from typing import Optional, List
 from sqlalchemy.orm import Session
-from app.api.ask_ai import ask_database
+from app.api.ask_ai import VocalResearchWorkflow
 from app.core import GERMLINE_TABLE_REGISTRY
 from app.api.oncoplot import oncoplot_search
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.interactions import interaction_search
+from langtrace_python_sdk.utils.with_root_span import with_langtrace_root_span
 from app.api.search import SearchRequest, SearchResponse, generic_search
 from fastapi import FastAPI, Depends, Path, HTTPException, APIRouter, Query
 from app.auth import verify_germline_token, TokenInfo, require_germline_access
@@ -136,11 +137,24 @@ async def fetch_structure(request: StructureRequest, db: Session = Depends(get_d
 
 
 @api_router.get("/ask")
+@with_langtrace_root_span()
 async def ask_endpoint(
     query: str = Query(..., description="Natural language query"),
     db: Session = Depends(get_db),
 ):
-    return await ask_database(query=query, db=db)
+    research_workflow = VocalResearchWorkflow(name="Parallel Research Pipeline")
+    try:
+        # Call the async run method directly
+        result = await research_workflow.run_async(query, db)
+        return result
+
+    except Exception as e:
+        # Fallback error handling
+        print(f"Workflow Critical Failure: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="An error occurred while processing your research workflow.",
+        )
 
 
 app = FastAPI()
