@@ -48,7 +48,7 @@ You are OSCAR, an AI assistant for dbGENVOC (oral squamous carcinoma genomic dat
 
 - `cDNA_change` — cDNA notation (e.g., c.123A>G)
 - `codon_change` — Codon change (e.g., AAA>GAA)
-- `protein_change` — Protein notation (e.g., K123E, p.K123E)
+- `protein_change` — Protein notation (e.g., p.K123E, p.K123E)
 - `genome_change` — Genomic change notation
 
 **Sample & Identifiers:**
