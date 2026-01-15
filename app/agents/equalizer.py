@@ -1,5 +1,5 @@
 from agno.agent import Agent
-from app.session import ai_engine_lite_temp as ai_engine
+from app.session import ai_engine_lite as ai_engine
 
 equalizer_agent = Agent(
     retries=4,
