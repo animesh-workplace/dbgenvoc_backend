@@ -64,22 +64,21 @@ class VocalResearchWorkflow(Workflow):
     async def run_async(self, query: str, db: Any) -> Dict[str, Any]:
         logger.info(f"Starting Workflow for: {query}")
 
-        equalizer_response = await asyncio.to_thread(
-            equalizer_agent.run, f"QUERY: {query}\nOUTPUT:"
-        )
-        logger.info(f"Equalizer response {equalizer_response.content}")
-        return {"content": equalizer_response.content}
+        # equalizer_response = await asyncio.to_thread(
+        #     equalizer_agent.run, f"QUERY: {query}\nOUTPUT:"
+        # )
+        # logger.info(f"Equalizer response {equalizer_response.content}")
 
-        # # --- STEP 1: PLAN (Orchestrator) ---
-        # try:
-        #     # Run Orchestrator to get the JSON plan
-        #     # We use a thread executor to keep the main loop non-blocking
-        #     plan_response = await asyncio.to_thread(orchestrator_agent.run, query)
-        #     plan = plan_response.content
-        #     logger.info(f"Plan for the workflow: {plan}")
-        # except (ValidationError, json.JSONDecodeError) as e:
-        #     logger.error(f"Planning failed: {e}")
-        #     return {"answer": "I had trouble planning this analysis. Please try again."}
+        # --- STEP 1: PLAN (Orchestrator) ---
+        try:
+            # Run Orchestrator to get the JSON plan
+            # We use a thread executor to keep the main loop non-blocking
+            plan_response = await asyncio.to_thread(orchestrator_agent.run, query)
+            plan = plan_response.content
+            logger.info(f"Plan for the workflow: {plan}")
+        except (ValidationError, json.JSONDecodeError) as e:
+            logger.error(f"Planning failed: {e}")
+            return {"answer": "I had trouble planning this analysis. Please try again."}
 
         # # --- STEP 2: PARALLEL EXECUTION ---
         # # We build a list of async tasks for every step in the plan
@@ -108,6 +107,10 @@ class VocalResearchWorkflow(Workflow):
 
         # # Filter out any messy exceptions from the list
         # valid_results = [r for r in results if not isinstance(r, Exception)]
+        return {
+            "planner": plan,
+            # "results": valid_results,
+        }
 
         # # --- STEP 3: SYNTHESIS ---
         # if not valid_results and not conversational_notes:
@@ -169,11 +172,11 @@ class VocalResearchWorkflow(Workflow):
 
         # 2. Execute DB Query (IO Bound)
         # This remains awaited directly as it uses async DB drivers
-        db_result = await execute_api_call(tool_name, params, db)
+        # db_result = await execute_api_call(tool_name, params, db)
 
         return {
             "tool_name": tool_name,
             "params": params,
-            "result": db_result,
+            # "result": db_result,
             "context": context,
         }
