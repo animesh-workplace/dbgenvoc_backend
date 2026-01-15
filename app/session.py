@@ -35,8 +35,19 @@ engine = create_engine(
 # ai_engine_open = Groq(id="groq/compound", api_key=os.getenv("GROQ_KEY"))
 
 ai_engine_pro = AwsBedrock(
-    id=os.getenv("AMAZON_MODEL_ID_PRO"),
+    top_p=1.0,
+    temperature=0.1,
     aws_region=os.getenv("AWS_REGION"),
+    id=os.getenv("AMAZON_MODEL_ID_PRO"),
+    aws_access_key_id=os.getenv("AMAZON_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.getenv("AMAZON_SECRET_ACCESS_KEY"),
+)
+
+ai_engine_lite = AwsBedrock(
+    top_p=1.0,
+    temperature=0.1,
+    aws_region=os.getenv("AWS_REGION"),
+    id=os.getenv("AMAZON_MODEL_ID_LITE"),
     aws_access_key_id=os.getenv("AMAZON_ACCESS_KEY_ID"),
     aws_secret_access_key=os.getenv("AMAZON_SECRET_ACCESS_KEY"),
 )
@@ -48,20 +59,6 @@ ai_engine_reason = AwsBedrock(
     aws_secret_access_key=os.getenv("AMAZON_SECRET_ACCESS_KEY"),
 )
 
-ai_engine_lite = AwsBedrock(
-    aws_region=os.getenv("AWS_REGION"),
-    id=os.getenv("AMAZON_MODEL_ID_LITE"),
-    aws_access_key_id=os.getenv("AMAZON_ACCESS_KEY_ID"),
-    aws_secret_access_key=os.getenv("AMAZON_SECRET_ACCESS_KEY"),
-)
-
-ai_engine_lite_temp = AwsBedrock(
-    temperature=0.1,
-    aws_region=os.getenv("AWS_REGION"),
-    id="google.gemma-3-27b-it",
-    aws_access_key_id=os.getenv("AMAZON_ACCESS_KEY_ID"),
-    aws_secret_access_key=os.getenv("AMAZON_SECRET_ACCESS_KEY"),
-)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 mapper_registry = registry()
