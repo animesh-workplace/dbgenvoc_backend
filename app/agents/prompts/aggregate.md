@@ -59,7 +59,7 @@ Extract table name from "Table: X" portion. If missing/ambiguous → return erro
 
 - `cDNA_change` — cDNA notation (e.g., c.123A>G)
 - `codon_change` — Codon change (e.g., AAA>GAA)
-- `protein_change` — Protein notation (e.g., K123E, p.K123E)
+- `protein_change` — Protein notation (e.g., p.K123E, p.K123E)
 - `genome_change` — Genomic change notation
 
 **Sample & Identifiers:**
@@ -590,7 +590,7 @@ Are multiple genes/values mentioned for same filter?
 
 ### Example 5: SNP Filtering
 
-**Input:** `"Table: nibmg_wg_somatic_variants | Request: Count SNPs in TP53"`
+**Input:** `"Table: nibmg_wg_somatic_variants | Request: Count SNPs in PIK3CA with the protein change E542K"`
 
 ```json
 {
@@ -601,8 +601,9 @@ Are multiple genes/values mentioned for same filter?
     "filters": {
       "logic": "AND",
       "conditions": [
-        { "column": "gene", "operator": "eq", "value": "TP53" },
-        { "column": "variant_type", "operator": "eq", "value": "SNP" }
+        { "column": "gene", "operator": "eq", "value": "PIK3CA" },
+        { "column": "variant_type", "operator": "eq", "value": "SNP" },
+        { "column": "protein_change", "operator": "eq", "value": "p.E542K" }
       ]
     }
   }
