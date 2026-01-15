@@ -23,6 +23,11 @@ class AggregationType(str, Enum):
     distinct_count = "distinct_count"
 
 
+class OrderDirection(str, Enum):
+    asc = "asc"
+    desc = "desc"
+
+
 class ConcatenatedAggregationRequest(BaseModel):
     separator: str = Field(", ", description="Separator for concatenation (e.g. ' > ')")
     columns: List[str] = Field(..., description="List of columns to concatenate")
@@ -50,6 +55,19 @@ class ConcatenatedAggregationRequest(BaseModel):
         description="HAVING clause to filter aggregated results (applied after GROUP BY)",
     )
 
+    order_by: Optional[Union[str, List[str]]] = Field(
+        None,
+        description="Column(s) to order results by. Use 'aggregated_value' for ordering by the aggregation result or 'concatenated_value' for ordering by the concatenated string. For multiple columns, provide as list.",
+    )
+
+    order_direction: OrderDirection = Field(
+        OrderDirection.desc, description="Order direction: asc or desc"
+    )
+
+    limit: Optional[int] = Field(
+        None, description="Limit the number of results returned"
+    )
+
     @field_validator("having")
     @classmethod
     def validate_having_requires_group_by(cls, v, info):
@@ -68,6 +86,46 @@ class ConcatenatedAggregationRequest(BaseModel):
                 )
         return v
 
+    @field_validator("order_by")
+    @classmethod
+    def validate_order_by(cls, v, info):
+        if v is not None:
+            group_by = info.data.get("group_by")
+            if not group_by:
+                # For non-grouped aggregations, only allow ordering by aggregated_value or concatenated_value
+                allowed = ["aggregated_value", "concatenated_value"]
+                if isinstance(v, str) and v not in allowed:
+                    raise ValueError(
+                        f"For non-grouped aggregations, order_by must be one of {allowed} or None"
+                    )
+                elif isinstance(v, list):
+                    raise ValueError(
+                        "For non-grouped aggregations, order_by cannot be a list"
+                    )
+            else:
+                # For grouped aggregations, validate order_by columns
+                if isinstance(v, str):
+                    allowed = ["aggregated_value", "concatenated_value"] + group_by
+                    if v not in allowed:
+                        raise ValueError(
+                            f"For grouped aggregations, order_by must be one of {allowed}"
+                        )
+                elif isinstance(v, list):
+                    for col in v:
+                        allowed = ["aggregated_value", "concatenated_value"] + group_by
+                        if col not in allowed:
+                            raise ValueError(
+                                f"Invalid order_by column '{col}'. Must be one of {allowed}"
+                            )
+        return v
+
+    @field_validator("limit")
+    @classmethod
+    def validate_limit(cls, v):
+        if v is not None and v < 1:
+            raise ValueError("Limit must be greater than 0")
+        return v
+
 
 class AggregationResponse(BaseModel):
     column: str
@@ -80,6 +138,11 @@ class AggregationResponse(BaseModel):
 
     # New Key: Group Totals
     group_totals: Optional[Dict[str, int]] = None
+
+    # Ordering and limiting information
+    order_by: Optional[Union[str, List[str]]] = None
+    order_direction: Optional[str] = None
+    limit: Optional[int] = None
 
     result: Union[Dict[str, Any], List[Dict[str, Any]]]
 
@@ -128,6 +191,75 @@ def _build_having_filter(having_clause: HavingClause, agg_expr):
         return or_(*conditions)
 
 
+def _apply_ordering_concatenated(
+    query,
+    order_by,
+    order_direction,
+    group_attrs,
+    agg_expr,
+    group_by_columns,
+    concatenated_col,
+):
+    """
+    Apply ordering to the concatenated aggregation query.
+
+    Args:
+        query: The SQLAlchemy query to order
+        order_by: String or list of strings specifying what to order by
+        order_direction: 'asc' or 'desc'
+        group_attrs: List of SQLAlchemy column attributes for group_by columns
+        agg_expr: The aggregation expression
+        group_by_columns: List of group_by column names
+        concatenated_col: The concatenated column expression
+
+    Returns:
+        Ordered query
+    """
+    order_clauses = []
+
+    def add_order_clause(column_expr):
+        """Helper to add order clause with direction."""
+        if order_direction == OrderDirection.desc:
+            return column_expr.desc()
+        else:
+            return column_expr.asc()
+
+    if order_by:
+        if isinstance(order_by, str):
+            # Single order by column
+            if order_by == "aggregated_value":
+                order_clauses.append(add_order_clause(agg_expr))
+            elif order_by == "concatenated_value":
+                order_clauses.append(add_order_clause(concatenated_col))
+            elif order_by in group_by_columns:
+                idx = group_by_columns.index(order_by)
+                order_clauses.append(add_order_clause(group_attrs[idx]))
+            else:
+                raise ValueError(
+                    f"Cannot order by '{order_by}'. Must be 'aggregated_value', 'concatenated_value', or one of group_by columns: {group_by_columns}"
+                )
+        else:
+            # Multiple order by columns
+            for order_col in order_by:
+                if order_col == "aggregated_value":
+                    order_clauses.append(add_order_clause(agg_expr))
+                elif order_col == "concatenated_value":
+                    order_clauses.append(add_order_clause(concatenated_col))
+                elif order_col in group_by_columns:
+                    idx = group_by_columns.index(order_col)
+                    order_clauses.append(add_order_clause(group_attrs[idx]))
+                else:
+                    raise ValueError(
+                        f"Cannot order by '{order_col}'. Must be 'aggregated_value', 'concatenated_value', or one of group_by columns: {group_by_columns}"
+                    )
+
+    # Apply ordering to query
+    if order_clauses:
+        query = query.order_by(*order_clauses)
+
+    return query
+
+
 # ==========================================
 #           MAIN API FUNCTION
 # ==========================================
@@ -138,14 +270,16 @@ async def generic_concatenated_aggregate(
 ) -> AggregationResponse:
     """
     Concatenates values from multiple columns (e.g., "Ref>Alt") and aggregates them.
-    Supports Scoped Percentages (percentage_by), Group Totals, and HAVING clause.
+    Supports Scoped Percentages (percentage_by), Group Totals, HAVING clause, ORDER BY, and LIMIT.
 
     Query execution order:
     1. FROM table_name
     2. WHERE (filters)
     3. GROUP BY (group_by + concatenated_value)
     4. HAVING (having clause on aggregated results)
-    5. SELECT (final result)
+    5. ORDER BY (order_by)
+    6. LIMIT (limit)
+    7. SELECT (final result)
     """
     try:
         model_class = get_model_class(table_name)
@@ -200,6 +334,7 @@ async def generic_concatenated_aggregate(
         if request.group_by:
             # === GROUPED AGGREGATION WITH CONCATENATION ===
             group_attrs = [getattr(model_class, c) for c in request.group_by]
+            group_by_columns = request.group_by
             extra_selects = []
 
             if request.aggregation_type in [
@@ -260,6 +395,22 @@ async def generic_concatenated_aggregate(
                 if request.having:
                     having_filter = _build_having_filter(request.having, agg_expr)
                     grouped_query = grouped_query.having(having_filter)
+
+                # Apply ORDER BY if specified
+                if request.order_by:
+                    grouped_query = _apply_ordering_concatenated(
+                        grouped_query,
+                        request.order_by,
+                        request.order_direction,
+                        group_attrs,
+                        agg_expr,
+                        group_by_columns,
+                        concatenated_col,
+                    )
+
+                # Apply LIMIT if specified
+                if request.limit:
+                    grouped_query = grouped_query.limit(request.limit)
 
                 # Execute Query
                 results = grouped_query.all()
@@ -340,6 +491,22 @@ async def generic_concatenated_aggregate(
                     having_filter = _build_having_filter(request.having, agg_expr)
                     grouped_query = grouped_query.having(having_filter)
 
+                # Apply ORDER BY if specified
+                if request.order_by:
+                    grouped_query = _apply_ordering_concatenated(
+                        grouped_query,
+                        request.order_by,
+                        request.order_direction,
+                        group_attrs,
+                        agg_expr,
+                        group_by_columns,
+                        concatenated_col,
+                    )
+
+                # Apply LIMIT if specified
+                if request.limit:
+                    grouped_query = grouped_query.limit(request.limit)
+
                 results = grouped_query.all()
                 groups_after_having = len(results)
 
@@ -360,6 +527,7 @@ async def generic_concatenated_aggregate(
                 AggregationType.percentage,
             ]:
                 count_col = func.count(concatenated_col)
+                agg_expr = count_col
 
                 agg_query = (
                     db.query(
@@ -377,8 +545,29 @@ async def generic_concatenated_aggregate(
 
                 # Apply HAVING clause if present
                 if request.having:
-                    having_filter = _build_having_filter(request.having, count_col)
+                    having_filter = _build_having_filter(request.having, agg_expr)
                     agg_query = agg_query.having(having_filter)
+
+                # Apply ORDER BY if specified (for non-grouped)
+                if request.order_by:
+                    if isinstance(request.order_by, str):
+                        if request.order_by == "aggregated_value":
+                            order_attr = count_col
+                        elif request.order_by == "concatenated_value":
+                            order_attr = concatenated_col
+                        else:
+                            raise ValueError(
+                                f"Invalid order_by for non-grouped: {request.order_by}"
+                            )
+
+                        if request.order_direction == OrderDirection.desc:
+                            agg_query = agg_query.order_by(order_attr.desc())
+                        else:
+                            agg_query = agg_query.order_by(order_attr.asc())
+
+                # Apply LIMIT if specified
+                if request.limit:
+                    agg_query = agg_query.limit(request.limit)
 
                 results = agg_query.all()
                 groups_after_having = len(results)
@@ -428,6 +617,9 @@ async def generic_concatenated_aggregate(
             groups_after_having=groups_after_having,
             having_applied=request.having is not None,
             group_totals=group_totals_map if group_totals_map else None,
+            order_by=request.order_by,
+            order_direction=request.order_direction.value,
+            limit=request.limit,
         )
 
     except HTTPException as he:
