@@ -388,7 +388,7 @@ Query: "Which 3 variant classes have the highest mutation counts?"
 
 ### Example 1: Patients with Both Gene Mutations
 
-Query: "Find patients with mutations in BOTH TP53 AND PIK3CA"
+Query: "Table: tcga_exome_somatic_variants | Request: Count distinct genes per sample for genes (TP53, PIK3CA), find samples with both genes mutated (use HAVING to filter for exactly 2 distinct genes)"
 
 ```json
 {
