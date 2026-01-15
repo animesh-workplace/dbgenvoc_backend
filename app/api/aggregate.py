@@ -1,9 +1,10 @@
 from enum import Enum
-from sqlalchemy import func
 from fastapi import HTTPException
+from sqlalchemy import func, and_, or_
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field, field_validator
 from app.schema_new import ComplexFilter, HavingClause, HavingCondition
+
 
 # ==========================================
 #               SCHEMAS
@@ -18,6 +19,11 @@ class AggregationType(str, Enum):
     count = "count"
     percentage = "percentage"
     distinct_count = "distinct_count"
+
+
+class OrderDirection(str, Enum):
+    asc = "asc"
+    desc = "desc"
 
 
 class AggregationRequest(BaseModel):
@@ -42,6 +48,19 @@ class AggregationRequest(BaseModel):
         description="HAVING clause to filter aggregated results (applied after GROUP BY)",
     )
 
+    order_by: Optional[Union[str, List[str]]] = Field(
+        None,
+        description="Column(s) to order results by. Use 'aggregated_value' for ordering by the aggregation result. For multiple columns, provide as list.",
+    )
+
+    order_direction: OrderDirection = Field(
+        OrderDirection.desc, description="Order direction: asc or desc"
+    )
+
+    limit: Optional[int] = Field(
+        None, description="Limit the number of results returned"
+    )
+
     @field_validator("having")
     @classmethod
     def validate_having_requires_group_by(cls, v, info):
@@ -60,6 +79,28 @@ class AggregationRequest(BaseModel):
                 )
         return v
 
+    @field_validator("order_by")
+    @classmethod
+    def validate_order_by(cls, v, info):
+        if v is not None and not info.data.get("group_by"):
+            # For scalar aggregations, only allow ordering by aggregated_value
+            if isinstance(v, str) and v != "aggregated_value":
+                raise ValueError(
+                    "For scalar aggregations (without group_by), order_by must be 'aggregated_value' or None"
+                )
+            elif isinstance(v, list):
+                raise ValueError(
+                    "For scalar aggregations (without group_by), order_by cannot be a list"
+                )
+        return v
+
+    @field_validator("limit")
+    @classmethod
+    def validate_limit(cls, v):
+        if v is not None and v < 1:
+            raise ValueError("Limit must be greater than 0")
+        return v
+
 
 class AggregationResponse(BaseModel):
     column: str
@@ -72,6 +113,10 @@ class AggregationResponse(BaseModel):
     # Contains the total count for each group defined in percentage_by
     # Key = "Value" (or "Value1|Value2" for composite), Value = Total Count
     group_totals: Optional[Dict[str, int]] = None
+    # Ordering and limiting information
+    order_by: Optional[Union[str, List[str]]] = None
+    order_direction: Optional[str] = None
+    limit: Optional[int] = None
     result: Union[Dict[str, Any], List[Dict[str, Any]]]
 
 
@@ -113,8 +158,6 @@ def _build_having_filter(having_clause: HavingClause, agg_expr):
     Returns:
         SQLAlchemy BinaryExpression for HAVING clause
     """
-    from sqlalchemy import and_, or_
-
     conditions = []
 
     for condition in having_clause.conditions:
@@ -143,6 +186,64 @@ def _build_having_filter(having_clause: HavingClause, agg_expr):
         return or_(*conditions)
 
 
+def _apply_ordering(
+    query, order_by, order_direction, group_attrs, agg_expr, group_by_columns
+):
+    """
+    Apply ordering to the query based on order_by specification.
+
+    Args:
+        query: The SQLAlchemy query to order
+        order_by: String or list of strings specifying what to order by
+        order_direction: 'asc' or 'desc'
+        group_attrs: List of SQLAlchemy column attributes for group_by columns
+        agg_expr: The aggregation expression
+        group_by_columns: List of group_by column names
+
+    Returns:
+        Ordered query
+    """
+    order_clauses = []
+
+    def add_order_clause(column_expr):
+        """Helper to add order clause with direction."""
+        if order_direction == OrderDirection.desc:
+            return column_expr.desc()
+        else:
+            return column_expr.asc()
+
+    if order_by:
+        if isinstance(order_by, str):
+            # Single order by column
+            if order_by == "aggregated_value":
+                order_clauses.append(add_order_clause(agg_expr))
+            elif order_by in group_by_columns:
+                idx = group_by_columns.index(order_by)
+                order_clauses.append(add_order_clause(group_attrs[idx]))
+            else:
+                raise ValueError(
+                    f"Cannot order by '{order_by}'. Must be 'aggregated_value' or one of group_by columns: {group_by_columns}"
+                )
+        else:
+            # Multiple order by columns
+            for order_col in order_by:
+                if order_col == "aggregated_value":
+                    order_clauses.append(add_order_clause(agg_expr))
+                elif order_col in group_by_columns:
+                    idx = group_by_columns.index(order_col)
+                    order_clauses.append(add_order_clause(group_attrs[idx]))
+                else:
+                    raise ValueError(
+                        f"Cannot order by '{order_col}'. Must be 'aggregated_value' or one of group_by columns: {group_by_columns}"
+                    )
+
+    # Apply ordering to query
+    if order_clauses:
+        query = query.order_by(*order_clauses)
+
+    return query
+
+
 # ==========================================
 #           MAIN AGGREGATION API
 # ==========================================
@@ -152,14 +253,16 @@ async def generic_aggregate(
     request: AggregationRequest, db, table_name: str
 ) -> AggregationResponse:
     """
-    Generic aggregation endpoint with HAVING clause support.
+    Generic aggregation endpoint with HAVING, ORDER BY, and LIMIT support.
 
     Query execution order:
     1. FROM table_name
     2. WHERE (filters)
     3. GROUP BY (group_by)
     4. HAVING (having clause on aggregated results)
-    5. SELECT (final result)
+    5. ORDER BY (order_by)
+    6. LIMIT (limit)
+    7. SELECT (final result)
     """
     try:
         from app.core import get_model_class, validate_columns, apply_filters
@@ -191,6 +294,7 @@ async def generic_aggregate(
         if request.group_by:
             # === GROUPED AGGREGATION ===
             group_attrs = [getattr(model_class, c) for c in request.group_by]
+            group_by_columns = request.group_by
             extra_selects = []
 
             # Determine aggregation expression
@@ -237,6 +341,21 @@ async def generic_aggregate(
                 having_filter = _build_having_filter(request.having, agg_expr)
                 grouped_query = grouped_query.having(having_filter)
 
+            # Apply ORDER BY if specified
+            if request.order_by:
+                grouped_query = _apply_ordering(
+                    grouped_query,
+                    request.order_by,
+                    request.order_direction,
+                    group_attrs,
+                    agg_expr,
+                    group_by_columns,
+                )
+
+            # Apply LIMIT if specified
+            if request.limit:
+                grouped_query = grouped_query.limit(request.limit)
+
             # Execute Query
             results = grouped_query.all()
             groups_after_having = len(results)
@@ -247,17 +366,17 @@ async def generic_aggregate(
             # Helper to find indices of percentage_by columns in result tuple
             pct_indices = []
             if request.percentage_by:
-                pct_indices = [request.group_by.index(c) for c in request.percentage_by]
+                pct_indices = [group_by_columns.index(c) for c in request.percentage_by]
 
             for result in results:
                 result_dict = {}
 
                 # A. Map Group Columns
-                for i, group_col in enumerate(request.group_by):
+                for i, group_col in enumerate(group_by_columns):
                     result_dict[group_col] = result[i]
 
                 # B. Map Aggregated Value
-                val_index = len(request.group_by)
+                val_index = len(group_by_columns)
                 val = result[val_index]
                 if (
                     request.aggregation_type == AggregationType.percentage
@@ -287,6 +406,9 @@ async def generic_aggregate(
 
         else:
             # === SCALAR AGGREGATION (No GROUP BY) ===
+            # For scalar aggregations, ordering and limiting don't make sense
+            # (except ordering by aggregated_value, but that's trivial for scalar)
+
             if request.aggregation_type == AggregationType.percentage:
                 val = await _calculate_global_percentage(
                     query, db, model_class, col_attr
@@ -309,6 +431,9 @@ async def generic_aggregate(
             aggregation_type=request.aggregation_type.value,
             having_applied=request.having is not None,
             group_totals=group_totals_map if group_totals_map else None,
+            order_by=request.order_by,
+            order_direction=request.order_direction.value,
+            limit=request.limit,
         )
 
     except HTTPException as he:
