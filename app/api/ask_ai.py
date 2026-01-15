@@ -1,19 +1,17 @@
 import json
 import asyncio
-from typing import Dict, Any, List
-
-from pydantic import BaseModel, Field, ValidationError
 from agno.utils.log import logger
+from typing import Dict, Any, List
 from agno.workflow import Workflow
-
 from app.api.search import generic_search
-from app.api.aggregate import generic_aggregate
-from app.api.aggregate_combination import generic_concatenated_aggregate
-
 from app.agents.search import search_agent
+from app.api.aggregate import generic_aggregate
 from app.agents.aggregate import aggregate_agent
-from app.agents.aggregate_combination import concate_aggregate_agent
+from app.agents.synthesizer import synthesizer_agent
+from pydantic import BaseModel, Field, ValidationError
 from app.agents.orchestrator import orchestrator_agent
+from app.agents.aggregate_combination import concate_aggregate_agent
+from app.api.aggregate_combination import generic_concatenated_aggregate
 
 
 # =========================
@@ -75,6 +73,15 @@ async def execute_api_call(tool_name: str, params: Any, db: Any) -> Any:
 # =========================
 # WORKFLOW
 # =========================
+DATA_TOOLS = {
+    "generic_search",
+    "generic_aggregate",
+    "generic_concatenated_aggregate",
+}
+
+REASONING_TOOLS = {
+    "answer_conversational",
+}
 
 
 class VocalResearchWorkflow(Workflow):
@@ -158,37 +165,95 @@ class VocalResearchWorkflow(Workflow):
         resolved_results: Dict[str, Any],
         db: Any,
     ) -> Dict[str, Any]:
-        logger.info(f"Executing step {step.step_id} using {step.tool_name}")
+        logger.info(f"Executing step {step.step_id} ({step.tool_name})")
 
-        if step.tool_name not in self.specialists:
-            return {
-                "step_id": step.step_id,
-                "error": f"Unsupported tool: {step.tool_name}",
-            }
+        # ---------------------------
+        # CASE 1: DATA / DB STEPS
+        # ---------------------------
+        if step.tool_name in DATA_TOOLS:
+            agent = self.specialists[step.tool_name]
 
-        agent = self.specialists[step.tool_name]
-
-        # Inject dependency results into context if present
-        context = step.query_context
-        if step.deps:
-            context += "\n\nDependency Results:\n" + json.dumps(
-                {d: resolved_results[d]["result"].result for d in step.deps},
-                indent=2,
+            # Resolve {{step_id}} placeholders if any
+            context = resolve_context_placeholders(
+                context=step.query_context,
+                deps=step.deps,
+                resolved_results=resolved_results,
             )
 
-        # Generate parameters (LLM → Pydantic)
-        params_response = await asyncio.to_thread(agent.run, context)
-        params = params_response.content
+            params_response = await asyncio.to_thread(agent.run, context)
+            params = params_response.content
 
-        # Execute database/API call
-        db_result = await execute_api_call(step.tool_name, params, db)
+            db_result = await execute_api_call(step.tool_name, params, db)
 
-        logger.info(
-            f"Executing step {step.step_id} using {step.tool_name}, params: {params}, result: {db_result}, {resolved_results}"
-        )
+            return {
+                "step_id": step.step_id,
+                "tool": step.tool_name,
+                "params": params,
+                "result": db_result,
+            }
+
+        # ---------------------------
+        # CASE 2: REASONING / CHAT STEPS
+        # ---------------------------
+        if step.tool_name in REASONING_TOOLS:
+            # Build a clean reasoning context
+            dependency_context = {
+                dep: resolved_results[dep]["result"].result for dep in step.deps
+            }
+
+            reasoning_prompt = f"""
+                You are given results from previous analysis steps.
+
+                Previous Results:
+                {json.dumps(dependency_context, indent=2)}
+
+                Instruction:
+                {step.query_context}
+
+                Provide a clear, concise answer.
+            """
+
+            response = await asyncio.to_thread(synthesizer_agent.run, reasoning_prompt)
+
+            return {
+                "step_id": step.step_id,
+                "tool": step.tool_name,
+                "result": response.content,
+            }
+
+        # ---------------------------
+        # UNKNOWN TOOL
+        # ---------------------------
         return {
             "step_id": step.step_id,
-            "tool": step.tool_name,
-            "params": params,
-            "result": db_result,
+            "error": f"Unsupported tool: {step.tool_name}",
         }
+
+
+def resolve_context_placeholders(
+    context: str,
+    deps: List[str],
+    resolved_results: Dict[str, Any],
+) -> str:
+    """
+    Replace {{step_id}} placeholders in query_context
+    with actual results from dependency steps.
+    """
+    for dep in deps:
+        placeholder = f"{{{{{dep}}}}}"
+
+        if placeholder not in context:
+            continue
+
+        try:
+            value = resolved_results[dep]["result"].result
+        except KeyError as e:
+            raise RuntimeError(f"Missing result for dependency '{dep}'") from e
+
+        # Convert complex objects safely
+        if not isinstance(value, str):
+            value = json.dumps(value)
+
+        context = context.replace(placeholder, value)
+
+    return context
