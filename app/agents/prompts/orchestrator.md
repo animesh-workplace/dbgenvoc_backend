@@ -636,7 +636,7 @@ Format: `"Table: [table_name] | Request: [description using ACTUAL COLUMN NAMES]
     {
       "step_id": "step_2",
       "tool_name": "generic_concatenated_aggregate",
-      "query_context": "Table: tcga_exome_somatic_variants | For top 3 genes from {{step_1}}, combine ref_allele and tumor_seq_allele2 to categorize as transitions (A>G=Ti, C>T=Ti, G>A=Ti, T>C=Ti) vs transversions (A>C=Tv, A>T=Tv, C>A=Tv, C>G=Tv, G>C=Tv, G>T=Tv, T>A=Tv, T>G=Tv), count each type, calculate Ti/Tv ratio per gene",
+      "query_context": "Table: tcga_exome_somatic_variants | Using these genes {{step_1}}, combine ref_allele and tumor_seq_allele2 to categorize as transitions (A>G=Ti, C>T=Ti, G>A=Ti, T>C=Ti) vs transversions (A>C=Tv, A>T=Tv, C>A=Tv, C>G=Tv, G>C=Tv, G>T=Tv, T>A=Tv, T>G=Tv), count each type, calculate Ti/Tv ratio per gene",
       "deps": ["step_1"]
     }
   ]
