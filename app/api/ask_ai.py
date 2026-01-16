@@ -90,7 +90,7 @@ class VocalResearchWorkflow(Workflow):
     ----------------------
     1. Orchestrator → Execution Plan (DAG)
     2. Parallel + Chained Execution
-    3. Structured Results (ready for synthesis)
+    3. Synthesizer runs at the end
     """
 
     specialists: Dict[str, Any] = {
@@ -150,69 +150,175 @@ class VocalResearchWorkflow(Workflow):
             return
 
         # =========================
-        # STEP 2: EXECUTION (DAG)
+        # STEP 2: SEPARATE DATA AND REASONING STEPS
+        # =========================
+        data_steps = [step for step in plan.plan if step.tool_name in DATA_TOOLS]
+        reasoning_steps = [
+            step for step in plan.plan if step.tool_name in REASONING_TOOLS
+        ]
+
+        # =========================
+        # STEP 3: EXECUTE DATA STEPS (DAG)
         # =========================
         results: Dict[str, Any] = {}
         pending_steps: Dict[str, SimplePlanStep] = {
-            step.step_id: step for step in plan.plan
+            step.step_id: step for step in data_steps
         }
 
-        while pending_steps:
-            # Find steps whose dependencies are satisfied
-            ready_steps = [
-                step
-                for step in pending_steps.values()
-                if all(dep in results for dep in step.deps)
-            ]
-
-            if not ready_steps:
-                logger.error("Circular or unresolved dependencies detected")
-                yield {
-                    "type": "error",
-                    "data": {"error": "Invalid plan: dependency deadlock"},
-                }
-                return
-
-            # Notify about steps being executed
+        if pending_steps:
             yield {
                 "type": "status",
-                "data": {
-                    "message": f"Executing {len(ready_steps)} step(s) in parallel",
-                    "steps": [step.step_id for step in ready_steps],
-                },
+                "data": {"message": "Executing data retrieval steps..."},
             }
 
-            tasks = [self.execute_plan_step(step, results, db) for step in ready_steps]
-            outputs = await asyncio.gather(*tasks, return_exceptions=True)
+            while pending_steps:
+                # Find steps whose dependencies are satisfied
+                ready_steps = [
+                    step
+                    for step in pending_steps.values()
+                    if all(dep in results for dep in step.deps)
+                ]
 
-            for step, output in zip(ready_steps, outputs):
-                if isinstance(output, Exception):
-                    logger.error(f"Step {step.step_id} failed: {output}")
-                    results[step.step_id] = {"error": str(output)}
-
+                if not ready_steps:
+                    logger.error("Circular or unresolved dependencies detected")
                     yield {
-                        "type": "step_error",
-                        "data": {"step_id": step.step_id, "error": str(output)},
+                        "type": "error",
+                        "data": {"error": "Invalid plan: dependency deadlock"},
                     }
-                else:
-                    results[step.step_id] = output
+                    return
 
-                    yield {
-                        "type": "step_complete",
-                        "data": {"step_id": step.step_id, "result": output},
-                    }
+                # Notify about steps being executed
+                yield {
+                    "type": "status",
+                    "data": {
+                        "message": f"Executing {len(ready_steps)} step(s) in parallel",
+                        "steps": [step.step_id for step in ready_steps],
+                    },
+                }
 
-                pending_steps.pop(step.step_id)
+                tasks = [
+                    self.execute_plan_step(step, results, db) for step in ready_steps
+                ]
+                outputs = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Final result
+                for step, output in zip(ready_steps, outputs):
+                    if isinstance(output, Exception):
+                        logger.error(f"Step {step.step_id} failed: {output}")
+                        results[step.step_id] = {"error": str(output)}
+
+                        yield {
+                            "type": "step_error",
+                            "data": {"step_id": step.step_id, "error": str(output)},
+                        }
+                    else:
+                        results[step.step_id] = output
+
+                        yield {
+                            "type": "step_complete",
+                            "data": {"step_id": step.step_id, "result": output},
+                        }
+
+                    pending_steps.pop(step.step_id)
+
+        # =========================
+        # STEP 4: RUN SYNTHESIS
+        # =========================
+        synthesis_result = None
+
+        if reasoning_steps or data_steps:
+            yield {
+                "type": "status",
+                "data": {"message": "Synthesizing final answer..."},
+            }
+
+            synthesis_result = await self.run_synthesis(
+                query=query,
+                data_results=results,
+                reasoning_steps=reasoning_steps,
+            )
+
+            yield {
+                "type": "synthesis_complete",
+                "data": {"synthesis": synthesis_result},
+            }
+
+        # =========================
+        # STEP 5: FINAL RESULT
+        # =========================
         final_data = {
             "plan": plan.model_dump(),
             "results": results,
+            "synthesis": synthesis_result,
         }
         yield {"type": "final", "data": final_data}
 
     # =========================
-    # STEP EXECUTION
+    # SYNTHESIS RUNNER
+    # =========================
+
+    async def run_synthesis(
+        self,
+        query: str,
+        data_results: Dict[str, Any],
+        reasoning_steps: List[SimplePlanStep],
+    ) -> str:
+        """
+        Run the synthesizer agent as the final step
+
+        Cases:
+        1. Plan has only one answer_conversational step → Direct response
+        2. Plan has data steps → Synthesize data into answer
+        """
+
+        # CASE 1: Single answer_conversational step (no data steps)
+        if len(reasoning_steps) == 1 and not data_results:
+            step = reasoning_steps[0]
+            prompt = f"""
+You are a helpful AI assistant. The user asked:
+
+"{query}"
+
+Context from the query plan:
+{step.query_context}
+
+Provide a clear, appropriate response to the user's question.
+"""
+
+        # CASE 2: Data steps exist → Synthesize results
+        else:
+            # Prepare data context
+            data_context = {}
+            for step_id, result in data_results.items():
+                if "result" in result:
+                    data_context[step_id] = result["result"]
+
+            # Include reasoning step contexts if any
+            reasoning_context = ""
+            if reasoning_steps:
+                reasoning_context = "\n\nAdditional Instructions:\n"
+                for step in reasoning_steps:
+                    reasoning_context += f"- {step.query_context}\n"
+
+            prompt = f"""
+You are synthesizing the final answer for the user's query.
+
+User Query:
+"{query}"
+
+Data Retrieved:
+{json.dumps(data_context, indent=2)}
+{reasoning_context}
+
+Provide a clear, comprehensive answer based on the data above. 
+Format your response in a user-friendly way that directly addresses their question.
+"""
+
+        # Run synthesizer
+        response = await asyncio.to_thread(synthesizer_agent.run, prompt)
+        return response.content
+
+    # =========================
+    # STEP EXECUTION (DATA ONLY)
     # =========================
 
     async def execute_plan_step(
@@ -223,9 +329,7 @@ class VocalResearchWorkflow(Workflow):
     ) -> Dict[str, Any]:
         logger.info(f"Executing step {step.step_id} ({step.tool_name})")
 
-        # ---------------------------
-        # CASE 1: DATA / DB STEPS
-        # ---------------------------
+        # Only DATA tools should reach here
         if step.tool_name in DATA_TOOLS:
             agent = self.specialists[step.tool_name]
 
@@ -250,34 +354,11 @@ class VocalResearchWorkflow(Workflow):
 
             return execution_result
 
-        # ---------------------------
-        # CASE 2: REASONING / CHAT STEPS
-        # ---------------------------
-        if step.tool_name in REASONING_TOOLS:
-            # Build a clean reasoning context
-            dependency_context = {
-                dep: resolved_results[dep]["result"].result for dep in step.deps
-            }
-
-            reasoning_prompt = f"""
-                You are given results from previous analysis steps.
-
-                Previous Results:
-                {json.dumps(dependency_context, indent=2)}
-
-                Instruction:
-                {step.query_context}
-
-                Provide a clear, concise answer.
-            """
-
-            response = await asyncio.to_thread(synthesizer_agent.run, reasoning_prompt)
-
-            return {
-                "step_id": step.step_id,
-                "tool": step.tool_name,
-                "result": response.content,
-            }
+        # This should not happen since we filter steps
+        return {
+            "step_id": step.step_id,
+            "error": f"Unsupported tool in data execution: {step.tool_name}",
+        }
 
 
 def resolve_context_placeholders(
@@ -296,7 +377,7 @@ def resolve_context_placeholders(
             continue
 
         try:
-            value = resolved_results[dep]["result"].result
+            value = resolved_results[dep]["result"]
         except KeyError as e:
             raise RuntimeError(f"Missing result for dependency '{dep}'") from e
 
