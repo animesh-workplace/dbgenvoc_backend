@@ -120,39 +120,39 @@ class VocalResearchWorkflow(Workflow):
         # =========================
         # STEP 2: EXECUTION (DAG)
         # =========================
-        results: Dict[str, Any] = {}
-        pending_steps: Dict[str, SimplePlanStep] = {
-            step.step_id: step for step in plan.plan
-        }
+        # results: Dict[str, Any] = {}
+        # pending_steps: Dict[str, SimplePlanStep] = {
+        #     step.step_id: step for step in plan.plan
+        # }
 
-        while pending_steps:
-            # Find steps whose dependencies are satisfied
-            ready_steps = [
-                step
-                for step in pending_steps.values()
-                if all(dep in results for dep in step.deps)
-            ]
+        # while pending_steps:
+        #     # Find steps whose dependencies are satisfied
+        #     ready_steps = [
+        #         step
+        #         for step in pending_steps.values()
+        #         if all(dep in results for dep in step.deps)
+        #     ]
 
-            if not ready_steps:
-                logger.error("Circular or unresolved dependencies detected")
-                return {"error": "Invalid plan: dependency deadlock"}
+        #     if not ready_steps:
+        #         logger.error("Circular or unresolved dependencies detected")
+        #         return {"error": "Invalid plan: dependency deadlock"}
 
-            tasks = [self.execute_plan_step(step, results, db) for step in ready_steps]
+        #     tasks = [self.execute_plan_step(step, results, db) for step in ready_steps]
 
-            outputs = await asyncio.gather(*tasks, return_exceptions=True)
+        #     outputs = await asyncio.gather(*tasks, return_exceptions=True)
 
-            for step, output in zip(ready_steps, outputs):
-                if isinstance(output, Exception):
-                    logger.error(f"Step {step.step_id} failed: {output}")
-                    results[step.step_id] = {"error": str(output)}
-                else:
-                    results[step.step_id] = output
+        #     for step, output in zip(ready_steps, outputs):
+        #         if isinstance(output, Exception):
+        #             logger.error(f"Step {step.step_id} failed: {output}")
+        #             results[step.step_id] = {"error": str(output)}
+        #         else:
+        #             results[step.step_id] = output
 
-                pending_steps.pop(step.step_id)
+        #         pending_steps.pop(step.step_id)
 
         return {
             "plan": plan.model_dump(),
-            "results": results,
+            # "results": results,
         }
 
     # =========================
