@@ -1,14 +1,16 @@
+import json
 from app.session import get_db
 from typing import Optional, List
 from sqlalchemy.orm import Session
-from app.api.ask_ai import VocalResearchWorkflow
 from app.core import GERMLINE_TABLE_REGISTRY
 from app.api.oncoplot import oncoplot_search
+from fastapi.responses import StreamingResponse
+from app.api.ask_ai import VocalResearchWorkflow
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.interactions import interaction_search
-from langtrace_python_sdk.utils.with_root_span import with_langtrace_root_span
 from app.api.search import SearchRequest, SearchResponse, generic_search
 from fastapi import FastAPI, Depends, Path, HTTPException, APIRouter, Query
+from langtrace_python_sdk.utils.with_root_span import with_langtrace_root_span
 from app.auth import verify_germline_token, TokenInfo, require_germline_access
 from app.api.structure import get_protein_structure, StructureResponse, StructureRequest
 from app.api.aggregate import generic_aggregate, AggregationRequest, AggregationResponse
@@ -140,16 +142,38 @@ async def fetch_structure(request: StructureRequest, db: Session = Depends(get_d
 @with_langtrace_root_span()
 async def ask_endpoint(
     query: str = Query(..., description="Natural language query"),
+    stream: bool = Query(False, description="Enable streaming response"),
     db: Session = Depends(get_db),
 ):
     research_workflow = VocalResearchWorkflow(name="Parallel Research Pipeline")
+
     try:
-        # Call the async run method directly
-        result = await research_workflow.run_async(query, db)
-        return result
+        if stream:
+            # Return streaming response
+            async def event_generator():
+                try:
+                    async for event in research_workflow.run_stream(query, db):
+                        # Format as Server-Sent Events
+                        yield f"data: {json.dumps(event)}\n\n"
+                except Exception as e:
+                    error_event = {"type": "error", "data": {"error": str(e)}}
+                    yield f"data: {json.dumps(error_event)}\n\n"
+
+            return StreamingResponse(
+                event_generator(),
+                media_type="text/event-stream",
+                headers={
+                    "Cache-Control": "no-cache",
+                    "Connection": "keep-alive",
+                    "X-Accel-Buffering": "no",  # Disable nginx buffering
+                },
+            )
+        else:
+            # Non-streaming response (backwards compatible)
+            result = await research_workflow.run_async(query, db)
+            return result
 
     except Exception as e:
-        # Fallback error handling
         print(f"Workflow Critical Failure: {e}")
         raise HTTPException(
             status_code=500,
