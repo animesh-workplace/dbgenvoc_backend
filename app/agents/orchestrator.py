@@ -57,6 +57,7 @@ orchestrator_agent = Agent(
     retries=4,
     model=ai_engine,
     use_json_mode=True,
+    delay_between_retries=5,
     output_schema=SimplePlan,
     system_message=SYSTEM_PROMPT,
 )
