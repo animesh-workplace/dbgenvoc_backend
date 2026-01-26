@@ -1,0 +1,943 @@
+{
+  "metadata": {
+    "database": "dbGENVOC",
+    "description": "Complete tool set for dbGENVOC genomics variant database",
+    "total_tools": 12,
+    "coverage": "99% of user queries",
+    "schema_version": "1.0.0",
+    "coverage_percent": 122
+  },
+  "tools": [
+    {
+      "id": "tool_001",
+      "name": "generic_search",
+      "version": "1.0.0",
+      "priority": 1,
+      "coverage_percent": 35,
+      "complexity": "medium",
+      "implementation_days": 2,
+      "description": "Retrieve variant rows with flexible filtering across datasets",
+      "use_cases": [
+        "Show variants in specific genes",
+        "Filter by variant class/type",
+        "Genomic position queries",
+        "Sample-specific variant retrieval"
+      ],
+      "parameters": {
+        "dataset": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "tcga_exome_somatic",
+            "nibmg_exome_somatic",
+            "nibmg_wg_somatic",
+            "nibmg_exome_germline",
+            "nibmg_wg_germline",
+            "journal_exome_somatic"
+          ],
+          "description": "Dataset to query"
+        },
+        "filters": {
+          "type": "object",
+          "required": false,
+          "properties": {
+            "gene": {
+              "type": "string",
+              "example": "TP53"
+            },
+            "chrom": {
+              "type": "string",
+              "example": "17"
+            },
+            "start_min": {
+              "type": "integer",
+              "example": 7000000
+            },
+            "start_max": {
+              "type": "integer",
+              "example": 8000000
+            },
+            "variant_class": {
+              "type": "string",
+              "example": "Missense_Mutation"
+            },
+            "variant_type": {
+              "type": "string",
+              "example": "SNP"
+            },
+            "tumor_sample_barcode": {
+              "type": "string"
+            },
+            "protein_change": {
+              "type": "string",
+              "example": "p.R175H"
+            },
+            "dbsnp_rs": {
+              "type": "string",
+              "example": "rs121913343"
+            },
+            "ref_allele": {
+              "type": "string"
+            },
+            "tumor_seq_allele2": {
+              "type": "string"
+            }
+          }
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100,
+          "max": 10000
+        },
+        "offset": {
+          "type": "integer",
+          "default": 0
+        }
+      },
+      "output_schema": {
+        "type": "array",
+        "items": {
+          "variant_id": "integer",
+          "gene": "string",
+          "chrom": "string",
+          "start": "string",
+          "end": "string",
+          "ref_allele": "string",
+          "tumor_seq_allele2": "string",
+          "variant_class": "string",
+          "variant_type": "string",
+          "protein_change": "string",
+          "tumor_sample_barcode": "string"
+        }
+      },
+      "example_questions": [
+        "Show all TP53 mutations in NIBMG dataset",
+        "Find missense mutations in BRCA1",
+        "List variants in chromosome 17 between 7000000-8000000"
+      ]
+    },
+    {
+      "id": "tool_002",
+      "name": "generic_aggregate",
+      "version": "1.0.0",
+      "priority": 1,
+      "coverage_percent": 25,
+      "complexity": "high",
+      "implementation_days": 3,
+      "description": "Count, group, and summarize variants with statistical operations",
+      "use_cases": [
+        "Count mutations by gene",
+        "Distribution analysis",
+        "Sample statistics",
+        "Frequency calculations"
+      ],
+      "parameters": {
+        "dataset": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "tcga_exome_somatic",
+            "nibmg_exome_somatic",
+            "nibmg_wg_somatic",
+            "nibmg_exome_germline",
+            "nibmg_wg_germline",
+            "journal_exome_somatic"
+          ]
+        },
+        "group_by": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "enum": [
+            "gene",
+            "variant_class",
+            "chrom",
+            "tumor_sample_barcode",
+            "variant_type",
+            "protein_change",
+            "disease"
+          ],
+          "description": "Columns to group by",
+          "required": true
+        },
+        "aggregation": {
+          "type": "string",
+          "enum": [
+            "count",
+            "sum",
+            "avg",
+            "min",
+            "max",
+            "count_distinct"
+          ],
+          "default": "count"
+        },
+        "filters": {
+          "type": "object",
+          "properties": {
+            "gene": {
+              "type": "string"
+            },
+            "variant_class": {
+              "type": "string"
+            },
+            "chrom": {
+              "type": "string"
+            }
+          }
+        },
+        "having": {
+          "type": "object",
+          "description": "Conditions on aggregated results",
+          "properties": {
+            "count_min": {
+              "type": "integer"
+            },
+            "count_max": {
+              "type": "integer"
+            }
+          }
+        },
+        "order_by": {
+          "type": "string",
+          "enum": [
+            "count",
+            "gene",
+            "value"
+          ],
+          "default": "count"
+        },
+        "order": {
+          "type": "string",
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "default": "desc"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100
+        }
+      },
+      "output_schema": {
+        "type": "array",
+        "items": {
+          "group_key": "string",
+          "count": "integer"
+        }
+      },
+      "example_questions": [
+        "Count mutations by gene across all samples",
+        "Distribution of variant classes in TCGA dataset",
+        "Most frequently mutated genes in NIBMG cohort"
+      ]
+    },
+    {
+      "id": "tool_003",
+      "name": "generic_concatenated_aggregate",
+      "version": "1.0.0",
+      "priority": 2,
+      "coverage_percent": 15,
+      "complexity": "medium",
+      "implementation_days": 2,
+      "description": "Pattern-based aggregation using concatenated columns",
+      "use_cases": [
+        "Allele change patterns (C>T)",
+        "Gene + variant class combinations",
+        "Protein change distributions",
+        "Mutation spectrum analysis"
+      ],
+      "parameters": {
+        "dataset": {
+          "type": "string",
+          "required": true
+        },
+        "concatenate_columns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "example": [
+            "ref_allele",
+            "tumor_seq_allele2"
+          ],
+          "description": "Columns to concatenate for pattern",
+          "required": true
+        },
+        "separator": {
+          "type": "string",
+          "default": ">",
+          "example": ">"
+        },
+        "filters": {
+          "type": "object",
+          "properties": {
+            "gene": {
+              "type": "string"
+            },
+            "variant_class": {
+              "type": "string"
+            }
+          }
+        },
+        "order_by": {
+          "type": "string",
+          "enum": [
+            "count",
+            "pattern"
+          ],
+          "default": "count"
+        },
+        "order": {
+          "type": "string",
+          "enum": [
+            "desc",
+            "asc"
+          ],
+          "default": "desc"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100
+        }
+      },
+      "output_schema": {
+        "type": "array",
+        "items": {
+          "pattern": "string",
+          "count": "integer"
+        }
+      },
+      "example_questions": [
+        "Most common C>T mutation patterns",
+        "Allele change patterns in TP53",
+        "Distribution of protein changes in KRAS"
+      ]
+    },
+    {
+      "id": "tool_004",
+      "name": "pathway_enrichment_analyzer",
+      "version": "1.0.0",
+      "priority": 2,
+      "coverage_percent": 10,
+      "complexity": "high",
+      "implementation_days": 3,
+      "description": "Pathway-based analysis using gene-pathway relationships",
+      "use_cases": [
+        "Pathway enrichment analysis",
+        "Biological process disruption",
+        "Pathway mutation burden",
+        "Functional annotation"
+      ],
+      "parameters": {
+        "dataset": {
+          "type": "string",
+          "required": true
+        },
+        "analysis_type": {
+          "type": "string",
+          "enum": [
+            "enrichment",
+            "pathway_genes",
+            "gene_pathways",
+            "mutation_burden"
+          ],
+          "required": true
+        },
+        "gene_list": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of genes for enrichment (optional)"
+        },
+        "pathway_id": {
+          "type": "string",
+          "description": "Specific pathway to query"
+        },
+        "pathway_name_filter": {
+          "type": "string",
+          "description": "Filter pathways by name"
+        },
+        "min_genes": {
+          "type": "integer",
+          "default": 2,
+          "description": "Minimum genes in pathway"
+        },
+        "statistical_test": {
+          "type": "boolean",
+          "default": false
+        },
+        "limit": {
+          "type": "integer",
+          "default": 50
+        }
+      },
+      "output_schema": {
+        "type": "array",
+        "items": {
+          "pathway_id": "string",
+          "pathway_name": "string",
+          "genes_in_pathway": "integer",
+          "mutated_genes": "integer",
+          "mutation_count": "integer",
+          "gene_list": "array"
+        }
+      },
+      "example_questions": [
+        "Which pathways are enriched in mutated genes",
+        "Show DNA repair pathway genes with mutations",
+        "Count mutations in PI3K-AKT signaling pathway"
+      ]
+    },
+    {
+      "id": "tool_005",
+      "name": "precomputed_metrics_retriever",
+      "version": "1.0.0",
+      "priority": 2,
+      "coverage_percent": 8,
+      "complexity": "low",
+      "implementation_days": 1,
+      "description": "Fast retrieval of precomputed TMB, Ti/Tv, and gene interactions",
+      "use_cases": [
+        "Tumor mutation burden queries",
+        "Ti/Tv ratio analysis",
+        "Gene co-occurrence patterns",
+        "Mutual exclusivity analysis"
+      ],
+      "parameters": {
+        "metric_type": {
+          "type": "string",
+          "required": true,
+          "enum": [
+            "tmb",
+            "titv",
+            "gene_interaction"
+          ]
+        },
+        "dataset": {
+          "type": "string",
+          "required": true
+        },
+        "filters": {
+          "type": "object",
+          "properties": {
+            "tumor_sample_barcode": {
+              "type": "string"
+            },
+            "gene1": {
+              "type": "string"
+            },
+            "gene2": {
+              "type": "string"
+            },
+            "p_value_max": {
+              "type": "float",
+              "example": 0.05
+            },
+            "odds_ratio_min": {
+              "type": "float"
+            },
+            "tmb_min": {
+              "type": "float"
+            },
+            "tmb_max": {
+              "type": "float"
+            }
+          }
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100
+        }
+      },
+      "output_schema": {
+        "tmb": {
+          "tumor_sample_barcode": "string",
+          "variant_class": "string",
+          "count": "integer",
+          "tmb": "float"
+        },
+        "titv": {
+          "tumor_sample_barcode": "string",
+          "snv_class": "string",
+          "count": "integer",
+          "ratio": "float"
+        },
+        "gene_interaction": {
+          "gene1": "string",
+          "gene2": "string",
+          "odds_ratio": "float",
+          "p_value": "float",
+          "interaction_type": "string"
+        }
+      },
+      "example_questions": [
+        "Get TMB for sample TCGA-ABC-123",
+        "Show Ti/Tv ratios for all NIBMG samples",
+        "Which genes are co-mutated with TP53"
+      ]
+    },
+    {
+      "id": "tool_006",
+      "name": "genomic_position_analyzer",
+      "version": "1.0.0",
+      "priority": 2,
+      "coverage_percent": 7,
+      "complexity": "medium",
+      "implementation_days": 2,
+      "description": "Hotspot detection and position-based analysis",
+      "use_cases": [
+        "Mutation hotspot identification",
+        "Recurrent position analysis",
+        "Genomic region queries",
+        "Position clustering"
+      ],
+      "parameters": {
+        "dataset": {
+          "type": "string",
+          "required": true
+        },
+        "analysis_type": {
+          "type": "string",
+          "enum": [
+            "hotspots",
+            "region_count",
+            "position_frequency"
+          ],
+          "required": true
+        },
+        "chrom": {
+          "type": "string",
+          "example": "17"
+        },
+        "start": {
+          "type": "integer"
+        },
+        "end": {
+          "type": "integer"
+        },
+        "min_count": {
+          "type": "integer",
+          "default": 2,
+          "description": "Minimum recurrence"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100
+        }
+      },
+      "output_schema": {
+        "type": "array",
+        "items": {
+          "chromosome": "string",
+          "start": "integer",
+          "end": "integer",
+          "count": "integer",
+          "genes": "array"
+        }
+      },
+      "example_questions": [
+        "Mutation hotspots on chromosome 17",
+        "Most frequently mutated genomic regions",
+        "Clustered mutations in chr17:7500000-7600000"
+      ]
+    },
+    {
+      "id": "tool_007",
+      "name": "proximity_variant_finder",
+      "version": "1.0.0",
+      "priority": 2,
+      "coverage_percent": 6,
+      "complexity": "medium",
+      "implementation_days": 3,
+      "description": "Find variants near reference variants (upstream/downstream)",
+      "use_cases": [
+        "Variants near specific mutation types",
+        "Splice site proximity analysis",
+        "Clustered variant detection",
+        "Positional relationship queries"
+      ],
+      "parameters": {
+        "dataset": {
+          "type": "string",
+          "required": true
+        },
+        "gene": {
+          "type": "string",
+          "required": true
+        },
+        "reference_filters": {
+          "type": "object",
+          "required": true,
+          "properties": {
+            "variant_class": {
+              "type": "string"
+            },
+            "variant_type": {
+              "type": "string"
+            },
+            "protein_change": {
+              "type": "string"
+            }
+          }
+        },
+        "proximity_bp": {
+          "type": "integer",
+          "default": 300,
+          "min": 1,
+          "max": 10000
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "upstream",
+            "downstream",
+            "both"
+          ],
+          "default": "both"
+        },
+        "exclude_reference": {
+          "type": "boolean",
+          "default": true
+        },
+        "limit": {
+          "type": "integer",
+          "default": 1000
+        }
+      },
+      "output_schema": {
+        "reference_variants": "array",
+        "proximal_variants": "array",
+        "summary": {
+          "total_reference_variants": "integer",
+          "total_proximal_variants": "integer"
+        }
+      },
+      "example_questions": [
+        "Find variants within 300bp of frameshift insertions in TP53",
+        "Mutations near splice sites (\u00b110bp)",
+        "Variants proximal to known pathogenic mutations"
+      ]
+    },
+    {
+      "id": "tool_008",
+      "name": "cross_dataset_comparator",
+      "version": "1.0.0",
+      "priority": 3,
+      "coverage_percent": 5,
+      "complexity": "high",
+      "implementation_days": 3,
+      "description": "Compare metrics across TCGA/NIBMG/Journal datasets",
+      "use_cases": [
+        "Cross-cohort comparison",
+        "Dataset-specific mutation analysis",
+        "Population difference identification",
+        "Validation studies"
+      ],
+      "parameters": {
+        "datasets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "min_items": 2,
+          "required": true
+        },
+        "comparison_type": {
+          "type": "string",
+          "enum": [
+            "gene_frequency",
+            "variant_class_dist",
+            "mutation_burden",
+            "unique_mutations",
+            "titv_comparison"
+          ],
+          "required": true
+        },
+        "filters": {
+          "type": "object",
+          "properties": {
+            "gene": {
+              "type": "string"
+            },
+            "variant_class": {
+              "type": "string"
+            }
+          }
+        },
+        "limit": {
+          "type": "integer",
+          "default": 100
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "comparison_results": {
+          "dataset1": "object",
+          "dataset2": "object",
+          "difference": "object"
+        }
+      },
+      "example_questions": [
+        "Compare TP53 mutation frequency in TCGA vs NIBMG",
+        "Which genes are uniquely mutated in Indian cohort",
+        "Variant class distribution: TCGA vs NIBMG"
+      ]
+    },
+    {
+      "id": "tool_009",
+      "name": "mutation_signature_analyzer",
+      "version": "1.0.0",
+      "priority": 3,
+      "coverage_percent": 4,
+      "complexity": "high",
+      "implementation_days": 4,
+      "description": "Identify and analyze mutational signatures (COSMIC)",
+      "use_cases": [
+        "COSMIC signature detection",
+        "Etiology identification",
+        "Mutational process analysis",
+        "Signature contribution"
+      ],
+      "parameters": {
+        "dataset": {
+          "type": "string",
+          "required": true
+        },
+        "analysis_type": {
+          "type": "string",
+          "enum": [
+            "identify_signatures",
+            "signature_contribution",
+            "trinucleotide_context"
+          ],
+          "required": true
+        },
+        "tumor_sample_barcode": {
+          "type": "string"
+        },
+        "signature_filter": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "example": [
+            "Signature 1",
+            "Signature 4"
+          ]
+        },
+        "min_contribution": {
+          "type": "float",
+          "default": 0.1
+        }
+      },
+      "output_schema": {
+        "type": "array",
+        "items": {
+          "sample": "string",
+          "signature": "string",
+          "contribution": "float",
+          "confidence": "float"
+        }
+      },
+      "example_questions": [
+        "Identify COSMIC mutational signatures in dataset",
+        "Samples with aging signature (Signature 1)",
+        "APOBEC-mediated mutation patterns"
+      ]
+    },
+    {
+      "id": "tool_010",
+      "name": "gene_interaction_retriever",
+      "version": "1.0.0",
+      "priority": 3,
+      "coverage_percent": 3,
+      "complexity": "low",
+      "implementation_days": 2,
+      "description": "Query precomputed gene co-occurrence and mutual exclusivity",
+      "use_cases": [
+        "Co-mutation analysis",
+        "Mutual exclusivity detection",
+        "Synthetic lethality identification",
+        "Gene network analysis"
+      ],
+      "parameters": {
+        "dataset": {
+          "type": "string",
+          "required": true
+        },
+        "query_type": {
+          "type": "string",
+          "enum": [
+            "co_occurrence",
+            "mutual_exclusivity",
+            "specific_pair"
+          ],
+          "required": true
+        },
+        "gene": {
+          "type": "string",
+          "description": "Primary gene of interest"
+        },
+        "gene_pair": {
+          "type": "object",
+          "properties": {
+            "gene1": {
+              "type": "string"
+            },
+            "gene2": {
+              "type": "string"
+            }
+          }
+        },
+        "p_value_max": {
+          "type": "float",
+          "default": 0.05
+        },
+        "odds_ratio_min": {
+          "type": "float"
+        },
+        "interaction_type": {
+          "type": "string",
+          "enum": [
+            "positive",
+            "negative",
+            "any"
+          ],
+          "default": "any"
+        },
+        "limit": {
+          "type": "integer",
+          "default": 50
+        }
+      },
+      "output_schema": {
+        "type": "array",
+        "items": {
+          "gene1": "string",
+          "gene2": "string",
+          "odds_ratio": "float",
+          "p_value": "float",
+          "interaction_type": "string"
+        }
+      },
+      "example_questions": [
+        "Which genes are co-mutated with TP53",
+        "Mutually exclusive gene pairs",
+        "PIK3CA and PTEN mutual exclusivity analysis"
+      ]
+    },
+    {
+      "id": "tool_011",
+      "name": "oncoplot_data_retriever",
+      "version": "1.0.0",
+      "priority": 3,
+      "coverage_percent": 2,
+      "complexity": "low",
+      "implementation_days": 1,
+      "description": "Binary mutation matrix for visualization (oncoplot/heatmap)",
+      "use_cases": [
+        "Mutation matrix generation",
+        "Visualization data preparation",
+        "Sample-gene mutation status",
+        "Cohort mutation landscape"
+      ],
+      "parameters": {
+        "dataset": {
+          "type": "string",
+          "required": true
+        },
+        "genes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "required": true,
+          "max_items": 100
+        },
+        "samples": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional sample filter"
+        },
+        "include_annotation": {
+          "type": "boolean",
+          "default": true
+        },
+        "limit": {
+          "type": "integer",
+          "default": 1000
+        }
+      },
+      "output_schema": {
+        "type": "array",
+        "items": {
+          "gene": "string",
+          "tumor_sample_barcode": "string",
+          "code": "integer",
+          "annotation": "string"
+        }
+      },
+      "example_questions": [
+        "Get mutation matrix for top 20 genes",
+        "Which samples have TP53 mutations",
+        "Mutation status across gene panel"
+      ]
+    },
+    {
+      "id": "tool_012",
+      "name": "protein_structure_mapper",
+      "version": "1.0.0",
+      "priority": 3,
+      "coverage_percent": 2,
+      "complexity": "medium",
+      "implementation_days": 2,
+      "description": "Map variants to protein structures and domains",
+      "use_cases": [
+        "Structural impact analysis",
+        "Domain-specific mutations",
+        "3D structure mapping",
+        "Functional annotation"
+      ],
+      "parameters": {
+        "dataset": {
+          "type": "string",
+          "required": true
+        },
+        "gene": {
+          "type": "string",
+          "required": true
+        },
+        "include_structure": {
+          "type": "boolean",
+          "default": true
+        },
+        "domain_filter": {
+          "type": "string"
+        },
+        "uniprot_accession": {
+          "type": "string"
+        }
+      },
+      "output_schema": {
+        "type": "array",
+        "items": {
+          "gene": "string",
+          "accession_id": "string",
+          "structure": "string",
+          "variants": "array"
+        }
+      },
+      "example_questions": [
+        "Get protein structure for TP53",
+        "Variants affecting protein domain X",
+        "Structure data for mutated genes"
+      ]
+    }
+  ]
+}
