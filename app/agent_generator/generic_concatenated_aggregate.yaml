@@ -1,0 +1,64 @@
+tool_definition:
+  name: "generic_concatenated_aggregate"
+  description: "Ti/Tv and allele pattern analysis"
+  version: "1.0.0"
+
+  placement:
+    node5_intent_description: "Ti/Tv or allele patterns"
+    node_priority: 3
+
+  parameters:
+    required:
+      - name: "table_name"
+        type: "str"
+        enum: ["nibmg_exome_somatic_variants", "nibmg_wg_somatic_variants",
+               "tcga_exome_somatic_variants", "journal_exome_somatic_variants"]
+        description: "Source table"
+
+      - name: "columns"
+        type: "List[str]"
+        description: "Columns to concatenate (e.g., ref_allele, tumor_seq_allele2)"
+
+      - name: "aggregation_type"
+        type: "str"
+        enum: ["count"]
+        description: "Aggregation type"
+
+    optional:
+      - name: "filters"
+        type: "ComplexFilter"
+        description: "Pre-aggregation filters"
+
+      - name: "group_by"
+        type: "List[str]"
+        description: "Additional grouping columns"
+
+      - name: "percentage_by"
+        type: "List[str]"
+        description: "Calculate percentages within these groups"
+
+      - name: "order_by"
+        type: "str"
+        description: "Sort column"
+
+      - name: "limit"
+        type: "int"
+        description: "Maximum results"
+
+  new_columns: []
+
+  query_context_template: "table_name: {table_name} | columns: {columns} | aggregation_type: {aggregation_type} | filters: {filters} | group_by: {group_by} | percentage_by: {percentage_by}"
+
+  example_queries:
+    - "Calculate Ti/Tv ratio for TP53"
+    - "Show most common ref>alt substitution patterns"
+    - "Get transition vs transversion counts for BRCA1"
+
+  validation_gates:
+    - condition: "columns is empty"
+      error: "Must specify at least one column to concatenate"
+      action: "return error"
+
+    - condition: "percentage_by not subset of group_by"
+      error: "percentage_by must be subset of group_by"
+      action: "return error"
