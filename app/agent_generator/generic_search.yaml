@@ -1,0 +1,47 @@
+tool_definition:
+  name: "generic_search"
+  description: "Retrieve variant rows with filters and pagination"
+  version: "1.0.0"
+
+  placement:
+    node5_intent_description: "Retrieve rows"
+    node_priority: 1
+
+  parameters:
+    required:
+      - name: "table_name"
+        type: "str"
+        enum: ["nibmg_exome_somatic_variants", "nibmg_wg_somatic_variants", 
+               "tcga_exome_somatic_variants", "journal_exome_somatic_variants"]
+        description: "Source table for variants"
+
+      - name: "filters"
+        type: "ComplexFilter"
+        description: "WHERE clause filters (gene, variant_class, etc.)"
+
+    optional:
+      - name: "page"
+        type: "int"
+        default: 1
+        description: "Page number for pagination"
+
+      - name: "page_size"
+        type: "int"
+        default: 10
+        min: 1
+        max: 100
+        description: "Number of results per page"
+
+  new_columns: []
+
+  query_context_template: "table_name: {table_name} | filters: {filters} | page: {page} | page_size: {page_size}"
+
+  example_queries:
+    - "Show me TP53 mutations"
+    - "Find BRCA1 missense variants"
+    - "Search for frameshift mutations in PIK3CA"
+
+  validation_gates:
+    - condition: "filters is empty"
+      error: "Search requires at least one filter"
+      action: "LEAF_A"
