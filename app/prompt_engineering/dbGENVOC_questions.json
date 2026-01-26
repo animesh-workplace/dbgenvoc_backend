@@ -1,0 +1,831 @@
+{
+  "metadata": {
+    "database": "dbGENVOC",
+    "description": "Genomics Variant Database - Indian Cancer Genomics Platform",
+    "total_questions": 135,
+    "categories": [
+      "Simple Retrieval",
+      "Aggregation & Statistics",
+      "Pattern Analysis",
+      "Pathway & Enrichment",
+      "Positional & Proximity",
+      "Cross-Dataset Comparison",
+      "Clinical & Sample Analysis",
+      "Mutation Signatures",
+      "Gene Interactions",
+      "Complex Multi-Step"
+    ]
+  },
+  "questions": [
+    {
+      "id": "Q001",
+      "category": "Simple Retrieval",
+      "question": "Show all TP53 mutations in NIBMG dataset",
+      "complexity": "low"
+    },
+    {
+      "id": "Q002",
+      "category": "Simple Retrieval",
+      "question": "Find missense mutations in BRCA1",
+      "complexity": "low"
+    },
+    {
+      "id": "Q003",
+      "category": "Simple Retrieval",
+      "question": "Get all frameshift mutations in PIK3CA",
+      "complexity": "low"
+    },
+    {
+      "id": "Q004",
+      "category": "Simple Retrieval",
+      "question": "Show variants on chromosome 17",
+      "complexity": "low"
+    },
+    {
+      "id": "Q005",
+      "category": "Simple Retrieval",
+      "question": "Find all mutations in TCGA breast cancer samples",
+      "complexity": "low"
+    },
+    {
+      "id": "Q006",
+      "category": "Simple Retrieval",
+      "question": "List all variants with dbSNP ID rs121913343",
+      "complexity": "low"
+    },
+    {
+      "id": "Q007",
+      "category": "Simple Retrieval",
+      "question": "Show germline variants in EGFR gene",
+      "complexity": "low"
+    },
+    {
+      "id": "Q008",
+      "category": "Simple Retrieval",
+      "question": "Get all stop-gain mutations across all datasets",
+      "complexity": "low"
+    },
+    {
+      "id": "Q009",
+      "category": "Simple Retrieval",
+      "question": "Find variants at position chr17:7577548",
+      "complexity": "low"
+    },
+    {
+      "id": "Q010",
+      "category": "Simple Retrieval",
+      "question": "Show all splice site variants in APC gene",
+      "complexity": "low"
+    },
+    {
+      "id": "Q011",
+      "category": "Simple Retrieval",
+      "question": "List mutations in sample TCGA-ABC-123",
+      "complexity": "low"
+    },
+    {
+      "id": "Q012",
+      "category": "Simple Retrieval",
+      "question": "Find all variants with protein change p.R175H",
+      "complexity": "low"
+    },
+    {
+      "id": "Q013",
+      "category": "Simple Retrieval",
+      "question": "Get all insertions in TP53",
+      "complexity": "low"
+    },
+    {
+      "id": "Q014",
+      "category": "Simple Retrieval",
+      "question": "Show variants in DNA repair genes",
+      "complexity": "low"
+    },
+    {
+      "id": "Q015",
+      "category": "Simple Retrieval",
+      "question": "Find all silent mutations in KRAS",
+      "complexity": "low"
+    },
+    {
+      "id": "Q016",
+      "category": "Simple Retrieval",
+      "question": "List variants in exon 5 of TP53",
+      "complexity": "low"
+    },
+    {
+      "id": "Q017",
+      "category": "Simple Retrieval",
+      "question": "Get all variants with MAF > 0.01",
+      "complexity": "low"
+    },
+    {
+      "id": "Q018",
+      "category": "Simple Retrieval",
+      "question": "Show variants annotated as pathogenic",
+      "complexity": "low"
+    },
+    {
+      "id": "Q019",
+      "category": "Simple Retrieval",
+      "question": "Find all variants in kinase domain of EGFR",
+      "complexity": "low"
+    },
+    {
+      "id": "Q020",
+      "category": "Simple Retrieval",
+      "question": "List all variants in chromosome 17 between 7000000-8000000",
+      "complexity": "low"
+    },
+    {
+      "id": "Q021",
+      "category": "Aggregation & Statistics",
+      "question": "Count mutations by gene across all samples",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q022",
+      "category": "Aggregation & Statistics",
+      "question": "Distribution of variant classes in TCGA dataset",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q023",
+      "category": "Aggregation & Statistics",
+      "question": "Most frequently mutated genes in NIBMG cohort",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q024",
+      "category": "Aggregation & Statistics",
+      "question": "Number of samples with TP53 mutations",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q025",
+      "category": "Aggregation & Statistics",
+      "question": "Average number of mutations per sample",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q026",
+      "category": "Aggregation & Statistics",
+      "question": "Count mutations by chromosome",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q027",
+      "category": "Aggregation & Statistics",
+      "question": "Distribution of variant types (SNV, INS, DEL)",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q028",
+      "category": "Aggregation & Statistics",
+      "question": "How many samples have more than 100 mutations",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q029",
+      "category": "Aggregation & Statistics",
+      "question": "Top 20 most mutated genes in breast cancer",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q030",
+      "category": "Aggregation & Statistics",
+      "question": "Count frameshift mutations by gene",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q031",
+      "category": "Aggregation & Statistics",
+      "question": "Distribution of mutations across exomes vs whole genome",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q032",
+      "category": "Aggregation & Statistics",
+      "question": "Number of unique patients in each dataset",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q033",
+      "category": "Aggregation & Statistics",
+      "question": "Count somatic vs germline variants",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q034",
+      "category": "Aggregation & Statistics",
+      "question": "How many genes have mutations in more than 50% of samples",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q035",
+      "category": "Aggregation & Statistics",
+      "question": "Distribution of mutations by cancer type",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q036",
+      "category": "Aggregation & Statistics",
+      "question": "Count mutations in each biological pathway",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q037",
+      "category": "Aggregation & Statistics",
+      "question": "Average mutations per megabase by sample",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q038",
+      "category": "Aggregation & Statistics",
+      "question": "Number of recurrent mutations (seen in >5 samples)",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q039",
+      "category": "Aggregation & Statistics",
+      "question": "Count novel vs known variants",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q040",
+      "category": "Aggregation & Statistics",
+      "question": "Distribution of variant allele frequencies",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q041",
+      "category": "Pattern Analysis",
+      "question": "Most common C>T mutation patterns",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q042",
+      "category": "Pattern Analysis",
+      "question": "Distribution of trinucleotide contexts in mutations",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q043",
+      "category": "Pattern Analysis",
+      "question": "Allele change patterns in TP53",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q044",
+      "category": "Pattern Analysis",
+      "question": "Most frequent protein changes in KRAS",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q045",
+      "category": "Pattern Analysis",
+      "question": "CpG to TpG transition frequency",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q046",
+      "category": "Pattern Analysis",
+      "question": "Common mutation hotspots in EGFR",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q047",
+      "category": "Pattern Analysis",
+      "question": "Distribution of indel lengths",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q048",
+      "category": "Pattern Analysis",
+      "question": "Most common substitution signatures",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q049",
+      "category": "Pattern Analysis",
+      "question": "Mutation spectrum analysis by gene",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q050",
+      "category": "Pattern Analysis",
+      "question": "Recurrent protein changes across samples",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q051",
+      "category": "Pattern Analysis",
+      "question": "Dinucleotide mutation patterns",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q052",
+      "category": "Pattern Analysis",
+      "question": "Frameshift vs inframe indel distribution",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q053",
+      "category": "Pattern Analysis",
+      "question": "Most common codon changes",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q054",
+      "category": "Pattern Analysis",
+      "question": "Mutational signatures present in dataset",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q055",
+      "category": "Pattern Analysis",
+      "question": "Distribution of purine vs pyrimidine changes",
+      "complexity": "medium"
+    },
+    {
+      "id": "Q056",
+      "category": "Pathway & Enrichment",
+      "question": "Which pathways are enriched in mutated genes",
+      "complexity": "high"
+    },
+    {
+      "id": "Q057",
+      "category": "Pathway & Enrichment",
+      "question": "Show DNA repair pathway genes with mutations",
+      "complexity": "high"
+    },
+    {
+      "id": "Q058",
+      "category": "Pathway & Enrichment",
+      "question": "Count mutations in PI3K-AKT signaling pathway",
+      "complexity": "high"
+    },
+    {
+      "id": "Q059",
+      "category": "Pathway & Enrichment",
+      "question": "Genes in cell cycle pathway with >10 mutations",
+      "complexity": "high"
+    },
+    {
+      "id": "Q060",
+      "category": "Pathway & Enrichment",
+      "question": "Pathway enrichment analysis for top 50 mutated genes",
+      "complexity": "high"
+    },
+    {
+      "id": "Q061",
+      "category": "Pathway & Enrichment",
+      "question": "Show all Reactome pathways affected by mutations",
+      "complexity": "high"
+    },
+    {
+      "id": "Q062",
+      "category": "Pathway & Enrichment",
+      "question": "Which metabolic pathways have mutated genes",
+      "complexity": "high"
+    },
+    {
+      "id": "Q063",
+      "category": "Pathway & Enrichment",
+      "question": "Apoptosis pathway genes with mutations",
+      "complexity": "high"
+    },
+    {
+      "id": "Q064",
+      "category": "Pathway & Enrichment",
+      "question": "MAPK signaling pathway mutation burden",
+      "complexity": "high"
+    },
+    {
+      "id": "Q065",
+      "category": "Pathway & Enrichment",
+      "question": "Genes in immune response pathways with mutations",
+      "complexity": "high"
+    },
+    {
+      "id": "Q066",
+      "category": "Pathway & Enrichment",
+      "question": "TP53 signaling pathway disruption analysis",
+      "complexity": "high"
+    },
+    {
+      "id": "Q067",
+      "category": "Pathway & Enrichment",
+      "question": "RTK-RAS pathway mutation analysis",
+      "complexity": "high"
+    },
+    {
+      "id": "Q068",
+      "category": "Positional & Proximity",
+      "question": "Find variants within 300bp of frameshift insertions in TP53",
+      "complexity": "high"
+    },
+    {
+      "id": "Q069",
+      "category": "Positional & Proximity",
+      "question": "Mutations near splice sites (\u00b110bp)",
+      "complexity": "high"
+    },
+    {
+      "id": "Q070",
+      "category": "Positional & Proximity",
+      "question": "Variants within 500bp of stop-gain mutations",
+      "complexity": "high"
+    },
+    {
+      "id": "Q071",
+      "category": "Positional & Proximity",
+      "question": "Co-localized variants in the same gene",
+      "complexity": "high"
+    },
+    {
+      "id": "Q072",
+      "category": "Positional & Proximity",
+      "question": "Clustered mutations in chr17:7500000-7600000",
+      "complexity": "high"
+    },
+    {
+      "id": "Q073",
+      "category": "Positional & Proximity",
+      "question": "Variants proximal to known pathogenic mutations",
+      "complexity": "high"
+    },
+    {
+      "id": "Q074",
+      "category": "Positional & Proximity",
+      "question": "Mutations upstream of ATG start codon",
+      "complexity": "high"
+    },
+    {
+      "id": "Q075",
+      "category": "Positional & Proximity",
+      "question": "Hotspot regions with >5 mutations",
+      "complexity": "high"
+    },
+    {
+      "id": "Q076",
+      "category": "Positional & Proximity",
+      "question": "Variants within 1kb of each other",
+      "complexity": "high"
+    },
+    {
+      "id": "Q077",
+      "category": "Positional & Proximity",
+      "question": "Mutations in 5' UTR region of TP53",
+      "complexity": "high"
+    },
+    {
+      "id": "Q078",
+      "category": "Positional & Proximity",
+      "question": "Variants near CpG islands",
+      "complexity": "high"
+    },
+    {
+      "id": "Q079",
+      "category": "Positional & Proximity",
+      "question": "Mutations in intronic regions near exons",
+      "complexity": "high"
+    },
+    {
+      "id": "Q080",
+      "category": "Positional & Proximity",
+      "question": "Co-occurring variants in adjacent codons",
+      "complexity": "high"
+    },
+    {
+      "id": "Q081",
+      "category": "Positional & Proximity",
+      "question": "Variants in regulatory regions upstream of TSS",
+      "complexity": "high"
+    },
+    {
+      "id": "Q082",
+      "category": "Positional & Proximity",
+      "question": "Positional clustering analysis for EGFR mutations",
+      "complexity": "high"
+    },
+    {
+      "id": "Q083",
+      "category": "Cross-Dataset Comparison",
+      "question": "Compare TP53 mutation frequency in TCGA vs NIBMG",
+      "complexity": "high"
+    },
+    {
+      "id": "Q084",
+      "category": "Cross-Dataset Comparison",
+      "question": "Which genes are uniquely mutated in Indian cohort",
+      "complexity": "high"
+    },
+    {
+      "id": "Q085",
+      "category": "Cross-Dataset Comparison",
+      "question": "Variant class distribution: TCGA vs NIBMG",
+      "complexity": "high"
+    },
+    {
+      "id": "Q086",
+      "category": "Cross-Dataset Comparison",
+      "question": "Common vs unique mutations between datasets",
+      "complexity": "high"
+    },
+    {
+      "id": "Q087",
+      "category": "Cross-Dataset Comparison",
+      "question": "Compare mutation burden: TCGA vs NIBMG samples",
+      "complexity": "high"
+    },
+    {
+      "id": "Q088",
+      "category": "Cross-Dataset Comparison",
+      "question": "Germline vs somatic mutation differences",
+      "complexity": "high"
+    },
+    {
+      "id": "Q089",
+      "category": "Cross-Dataset Comparison",
+      "question": "Exome vs whole genome mutation density comparison",
+      "complexity": "high"
+    },
+    {
+      "id": "Q090",
+      "category": "Cross-Dataset Comparison",
+      "question": "Which mutations are specific to breast cancer in India",
+      "complexity": "high"
+    },
+    {
+      "id": "Q091",
+      "category": "Cross-Dataset Comparison",
+      "question": "Compare Ti/Tv ratios across datasets",
+      "complexity": "high"
+    },
+    {
+      "id": "Q092",
+      "category": "Cross-Dataset Comparison",
+      "question": "Dataset-specific mutation signatures",
+      "complexity": "high"
+    },
+    {
+      "id": "Q093",
+      "category": "Cross-Dataset Comparison",
+      "question": "Mutation frequency differences for cancer driver genes",
+      "complexity": "high"
+    },
+    {
+      "id": "Q094",
+      "category": "Cross-Dataset Comparison",
+      "question": "Compare pathway disruption across datasets",
+      "complexity": "high"
+    },
+    {
+      "id": "Q095",
+      "category": "Clinical & Sample Analysis",
+      "question": "Samples with high tumor mutation burden (>10 mut/Mb)",
+      "complexity": "high"
+    },
+    {
+      "id": "Q096",
+      "category": "Clinical & Sample Analysis",
+      "question": "TMB distribution across cancer types",
+      "complexity": "high"
+    },
+    {
+      "id": "Q097",
+      "category": "Clinical & Sample Analysis",
+      "question": "Samples with TP53 and PIK3CA co-mutations",
+      "complexity": "high"
+    },
+    {
+      "id": "Q098",
+      "category": "Clinical & Sample Analysis",
+      "question": "Which samples have actionable mutations",
+      "complexity": "high"
+    },
+    {
+      "id": "Q099",
+      "category": "Clinical & Sample Analysis",
+      "question": "Ti/Tv ratio for each sample",
+      "complexity": "high"
+    },
+    {
+      "id": "Q100",
+      "category": "Clinical & Sample Analysis",
+      "question": "Samples with microsatellite instability signatures",
+      "complexity": "high"
+    },
+    {
+      "id": "Q101",
+      "category": "Clinical & Sample Analysis",
+      "question": "Hypermutated samples (>1000 mutations)",
+      "complexity": "high"
+    },
+    {
+      "id": "Q102",
+      "category": "Clinical & Sample Analysis",
+      "question": "Mutation load correlation with cancer type",
+      "complexity": "high"
+    },
+    {
+      "id": "Q103",
+      "category": "Clinical & Sample Analysis",
+      "question": "Samples with known resistance mutations",
+      "complexity": "high"
+    },
+    {
+      "id": "Q104",
+      "category": "Clinical & Sample Analysis",
+      "question": "Patients with germline pathogenic variants",
+      "complexity": "high"
+    },
+    {
+      "id": "Q105",
+      "category": "Mutation Signatures",
+      "question": "Identify COSMIC mutational signatures in dataset",
+      "complexity": "high"
+    },
+    {
+      "id": "Q106",
+      "category": "Mutation Signatures",
+      "question": "Samples with aging signature (Signature 1)",
+      "complexity": "high"
+    },
+    {
+      "id": "Q107",
+      "category": "Mutation Signatures",
+      "question": "Smoking-associated mutations (Signature 4)",
+      "complexity": "high"
+    },
+    {
+      "id": "Q108",
+      "category": "Mutation Signatures",
+      "question": "APOBEC-mediated mutation patterns",
+      "complexity": "high"
+    },
+    {
+      "id": "Q109",
+      "category": "Mutation Signatures",
+      "question": "UV damage signature in skin cancer samples",
+      "complexity": "high"
+    },
+    {
+      "id": "Q110",
+      "category": "Mutation Signatures",
+      "question": "Defective DNA mismatch repair signatures",
+      "complexity": "high"
+    },
+    {
+      "id": "Q111",
+      "category": "Mutation Signatures",
+      "question": "POLE/POLD1 proofreading deficiency signatures",
+      "complexity": "high"
+    },
+    {
+      "id": "Q112",
+      "category": "Mutation Signatures",
+      "question": "Homologous recombination deficiency signatures",
+      "complexity": "high"
+    },
+    {
+      "id": "Q113",
+      "category": "Gene Interactions",
+      "question": "Which genes are co-mutated with TP53",
+      "complexity": "high"
+    },
+    {
+      "id": "Q114",
+      "category": "Gene Interactions",
+      "question": "Mutually exclusive gene pairs",
+      "complexity": "high"
+    },
+    {
+      "id": "Q115",
+      "category": "Gene Interactions",
+      "question": "Significant gene co-occurrence patterns (p<0.05)",
+      "complexity": "high"
+    },
+    {
+      "id": "Q116",
+      "category": "Gene Interactions",
+      "question": "Genes that always co-occur with KRAS mutations",
+      "complexity": "high"
+    },
+    {
+      "id": "Q117",
+      "category": "Gene Interactions",
+      "question": "Synthetic lethal gene pairs",
+      "complexity": "high"
+    },
+    {
+      "id": "Q118",
+      "category": "Gene Interactions",
+      "question": "TP53 and MDM2 co-mutation frequency",
+      "complexity": "high"
+    },
+    {
+      "id": "Q119",
+      "category": "Gene Interactions",
+      "question": "Gene interaction network for top 20 mutated genes",
+      "complexity": "high"
+    },
+    {
+      "id": "Q120",
+      "category": "Gene Interactions",
+      "question": "Oncogene-tumor suppressor co-mutation patterns",
+      "complexity": "high"
+    },
+    {
+      "id": "Q121",
+      "category": "Gene Interactions",
+      "question": "PIK3CA and PTEN mutual exclusivity analysis",
+      "complexity": "high"
+    },
+    {
+      "id": "Q122",
+      "category": "Gene Interactions",
+      "question": "Gene pairs with odds ratio > 5",
+      "complexity": "high"
+    },
+    {
+      "id": "Q123",
+      "category": "Complex Multi-Step",
+      "question": "Find patients with actionable mutations in druggable genes with TMB>10",
+      "complexity": "high"
+    },
+    {
+      "id": "Q124",
+      "category": "Complex Multi-Step",
+      "question": "Identify samples with DNA repair pathway mutations and high Ti/Tv ratio",
+      "complexity": "high"
+    },
+    {
+      "id": "Q125",
+      "category": "Complex Multi-Step",
+      "question": "Which pathways are enriched in hypermutated samples",
+      "complexity": "high"
+    },
+    {
+      "id": "Q126",
+      "category": "Complex Multi-Step",
+      "question": "Genes with clustered mutations showing hotspot patterns",
+      "complexity": "high"
+    },
+    {
+      "id": "Q127",
+      "category": "Complex Multi-Step",
+      "question": "Compare mutation signatures between high and low TMB samples",
+      "complexity": "high"
+    },
+    {
+      "id": "Q128",
+      "category": "Complex Multi-Step",
+      "question": "Find genes with multiple frameshift mutations causing LOF",
+      "complexity": "high"
+    },
+    {
+      "id": "Q129",
+      "category": "Complex Multi-Step",
+      "question": "Identify samples with both germline and somatic TP53 mutations",
+      "complexity": "high"
+    },
+    {
+      "id": "Q130",
+      "category": "Complex Multi-Step",
+      "question": "Which genes have different mutation patterns in TCGA vs NIBMG",
+      "complexity": "high"
+    },
+    {
+      "id": "Q131",
+      "category": "Complex Multi-Step",
+      "question": "Find pathways with significantly different mutation rates across datasets",
+      "complexity": "high"
+    },
+    {
+      "id": "Q132",
+      "category": "Complex Multi-Step",
+      "question": "Identify samples with co-occurring driver mutations in multiple pathways",
+      "complexity": "high"
+    },
+    {
+      "id": "Q133",
+      "category": "Complex Multi-Step",
+      "question": "Find genes with position-specific mutation preferences",
+      "complexity": "high"
+    },
+    {
+      "id": "Q134",
+      "category": "Complex Multi-Step",
+      "question": "Analyze mutation timing using VAF in multi-region samples",
+      "complexity": "high"
+    },
+    {
+      "id": "Q135",
+      "category": "Complex Multi-Step",
+      "question": "Identify convergent evolution patterns (different mutations, same effect)",
+      "complexity": "high"
+    }
+  ]
+}
