@@ -14,14 +14,26 @@ from langtrace_python_sdk.utils.with_root_span import with_langtrace_root_span
 from app.auth import verify_germline_token, TokenInfo, require_germline_access
 from app.api.structure import get_protein_structure, StructureResponse, StructureRequest
 from app.api.aggregate import generic_aggregate, AggregationRequest, AggregationResponse
+from app.api.precomputed_metrics_retriever import (
+    precomputed_metrics_retriever,
+    PrecomputedMetricsRequest,
+    PrecomputedMetricsResponse,
+    get_tmb_statistics,
+    get_high_tmb_samples,
+)
+from app.api.proximity_variant_finder import (
+    ProximityVariantRequest,
+    ProximityVariantResponse,
+    proximity_variant_finder,
+)
 from app.api.aggregate_combination import (
     ConcatenatedAggregationRequest,
     generic_concatenated_aggregate,
 )
 from app.api.autocomplete import (
-    unified_autocomplete,
     SuggestionSection,
     AutocompleteRequest,
+    unified_autocomplete,
 )
 from app.schema import (
     OncoplotRequest,
@@ -136,6 +148,29 @@ async def fetch_structure(request: StructureRequest, db: Session = Depends(get_d
     Get protein structure domains/regions dynamically by gene name.
     """
     return await get_protein_structure(request, db)
+
+
+@api_router.post(
+    "/precomputed_metrics_retriever", response_model=PrecomputedMetricsResponse
+)
+async def retrieve_metrics(
+    request: PrecomputedMetricsRequest, db: Session = Depends(get_db)
+):
+    return await precomputed_metrics_retriever(request, db)
+
+
+@api_router.post(
+    "/{table_name}/proximity_variant_finder", response_model=ProximityVariantResponse
+)
+async def variant_finder(
+    request: ProximityVariantRequest,
+    db: Session = Depends(get_db),
+    token_info: Optional[TokenInfo] = Depends(verify_germline_token),
+    table_name: str = Path(
+        ..., description="Name of the table to get interaction data"
+    ),
+):
+    return await proximity_variant_finder(request=request, table_name=table_name, db=db)
 
 
 @api_router.get("/ask")
