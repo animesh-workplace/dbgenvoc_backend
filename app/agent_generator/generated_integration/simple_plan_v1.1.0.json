@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SimplePlan",
+  "version": "1.1.0",
+  "type": "object",
+  "required": [
+    "plan"
+  ],
+  "properties": {
+    "plan": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "step_id",
+          "tool_name",
+          "query_context",
+          "deps"
+        ],
+        "properties": {
+          "step_id": {
+            "type": "string"
+          },
+          "tool_name": {
+            "type": "string",
+            "enum": [
+              "generic_search",
+              "generic_aggregate",
+              "generic_concatenated_aggregate"
+            ]
+          },
+          "query_context": {
+            "type": "string"
+          },
+          "deps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}
