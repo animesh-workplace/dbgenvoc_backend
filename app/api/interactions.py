@@ -29,7 +29,6 @@ async def interaction_search(request: OncoplotRequest, table_name, db):
         df_reverse = df[["gene2", "gene1", "neg_log10_pval"]].copy()
         df_reverse.columns = ["gene1", "gene2", "neg_log10_pval"]
         df_combined = pandas.concat([df_symmetric, df_reverse], ignore_index=True)
-        print(df_combined)
 
         # Create pivot table
         df_pivot = df_combined.pivot_table(
@@ -39,7 +38,6 @@ async def interaction_search(request: OncoplotRequest, table_name, db):
             columns="gene2",
             values="neg_log10_pval",
         )
-        print(df_pivot)
         # Build heatmap data for upper triangle only
         heatmap_data = []
         for i, gene_y in enumerate(sorted_genes):  # y-axis (rows)
