@@ -289,8 +289,18 @@ Provide a clear, appropriate response to the user's question.
             # Prepare data context
             data_context = {}
             for step_id, result in data_results.items():
-                if "result" in result:
-                    data_context[step_id] = result["result"]
+                tool_name = result.get("tool")
+
+                # Case 1: generic_search → metadata only
+                if tool_name == "generic_search":
+                    filtered_result = {k: v for k, v in result.items() if k != "result"}
+
+                # Case 2: all other tools → full payload
+                else:
+                    filtered_result = result
+
+                if filtered_result:
+                    data_context[step_id] = filtered_result
 
             # Include reasoning step contexts if any
             reasoning_context = ""
@@ -306,7 +316,7 @@ User Query:
 "{query}"
 
 Data Retrieved:
-{json.dumps(data_context, indent=2)}
+{json.dumps(data_context, indent=0)}
 {reasoning_context}
 
 Provide a clear, comprehensive answer based on the data above. 
