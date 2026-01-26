@@ -12,9 +12,9 @@ from sqlalchemy.orm import registry, sessionmaker
 load_dotenv()
 SQLALCHEMY_DATABASE_URL = "sqlite:///database/database.sqlite3"
 
-langtrace.init(
-    api_key="e46c7e7a3da2478c4864f3c46beab8a00416a4fbfcfd175390e159e731b97a91"
-)
+# langtrace.init(
+#     api_key="e46c7e7a3da2478c4864f3c46beab8a00416a4fbfcfd175390e159e731b97a91"
+# )
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
