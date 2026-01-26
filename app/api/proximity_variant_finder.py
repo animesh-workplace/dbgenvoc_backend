@@ -1,25 +1,13 @@
-"""
-proximity_variant_finder.py
-
-Finds variants that are in proximity to reference variants or genomic features.
-Useful for identifying co-occurring mutations, clustered variants, and variants
-near specific mutation types.
-
-Author: Generated based on dbGENVOC API patterns
-Date: 2026-01-23
-"""
-
 from enum import Enum
 from fastapi import HTTPException
-from sqlalchemy import func, and_, or_, between, case
-from typing import Any, Dict, List, Optional, Tuple
-from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import and_, or_
 from app.schema_new import ComplexFilter
+from typing import Any, Dict, List, Optional
+from pydantic import BaseModel, Field, field_validator
 from app.core import (
+    row_to_dict,
     apply_filters,
     get_model_class,
-    validate_columns,
-    row_to_dict,
 )
 
 
@@ -36,120 +24,237 @@ class ProximityDirection(str, Enum):
     both = "both"  # Both directions
 
 
-class ReferenceVariantType(str, Enum):
-    """Type of reference variants to search near"""
+class DistanceMode(str, Enum):
+    """Distance filter mode"""
 
-    frameshift = "frameshift"  # Near frameshift mutations
-    nonsense = "nonsense"  # Near nonsense mutations
-    splice_site = "splice_site"  # Near splice site mutations
-    missense = "missense"  # Near missense mutations
-    specific_gene = "specific_gene"  # Near variants in specific gene
-    custom_filter = "custom_filter"  # Use custom filters for reference
+    within = "within"  # Distance ≤ proximity_distance (default)
+    beyond = "beyond"  # Distance ≥ proximity_distance
+    exact = "exact"  # Distance = proximity_distance (±1bp tolerance)
+    range = "range"  # Between min_distance and max_distance
+
+
+class DistanceUnit(str, Enum):
+    """Unit of distance measurement"""
+
+    bp = "bp"  # Base pairs (default)
+    kb = "kb"  # Kilobases (1kb = 1000bp)
+    mb = "mb"  # Megabases (1mb = 1,000,000bp)
+    codon = "codon"  # Codons (1 codon = 3bp, for coding regions)
 
 
 class SortOrder(str, Enum):
     """Sort order"""
 
-    ASC = "asc"
-    DESC = "desc"
+    asc = "asc"
+    desc = "desc"
 
 
 class ProximityVariantRequest(BaseModel):
     """Request model for proximity variant search"""
 
-    # Dataset to search
-    dataset: str = Field(
+    # Reference variant definition (REQUIRED)
+    reference_filters: ComplexFilter = Field(
         ...,
-        description="Dataset name (e.g., 'nibmg_exome_somatic', 'tcga_exome_somatic')",
+        description="Filters to identify reference variants",
     )
 
-    # Reference variant definition
-    reference_variant_type: ReferenceVariantType = Field(
-        ReferenceVariantType.frameshift,
-        description="Type of reference variants to search near",
+    # Distance parameters
+    distance_mode: DistanceMode = Field(
+        DistanceMode.within,
+        description="Distance filter mode (within/beyond/exact/range)",
     )
 
-    reference_gene: Optional[str] = Field(
+    proximity_distance: int = Field(
+        300,
+        ge=1,
+        le=10000000,
+        description="Distance threshold (or min distance for 'range' mode)",
+    )
+
+    max_proximity_distance: Optional[int] = Field(
         None,
-        description="Gene symbol for reference variants (for 'specific_gene' type)",
+        ge=1,
+        le=10000000,
+        description="Maximum distance (required for 'range' mode)",
     )
 
-    reference_filters: Optional[ComplexFilter] = Field(
-        None,
-        description="Custom filters for reference variants (for 'custom_filter' type)",
-    )
-
-    # Proximity parameters
-    proximity_bp: int = Field(
-        300, ge=1, le=100000, description="Proximity distance in base pairs"
+    distance_unit: DistanceUnit = Field(
+        DistanceUnit.bp,
+        description="Unit of distance measurement (bp/kb/mb/codon)",
     )
 
     direction: ProximityDirection = Field(
         ProximityDirection.both,
-        description="Direction to search (upstream, downstream, or both)",
+        description="Direction to search (upstream/downstream/both)",
     )
 
-    # Query variant filters
+    # Query variant filters (optional)
     query_filters: Optional[ComplexFilter] = Field(
-        None, description="Filters for query variants (variants to find near reference)"
+        None,
+        description="Additional filters for query variants",
     )
 
     exclude_reference: bool = Field(
-        True, description="Exclude reference variants from results"
+        True,
+        description="Exclude reference variants from results",
     )
 
     same_gene_only: bool = Field(
-        False, description="Only find variants in the same gene as reference"
+        False,
+        description="Only find variants in the same gene as reference",
     )
 
-    # Chromosome filter (optional - for performance)
+    same_chromosome_only: bool = Field(
+        True,
+        description="Only search within the same chromosome",
+    )
+
+    # Chromosome filter (optional)
     chromosome: Optional[str] = Field(
-        None, description="Limit search to specific chromosome"
+        None,
+        description="Limit search to specific chromosome",
     )
 
-    # Sorting and limiting
+    # ===== AGGREGATION (HAVING-LIKE LOGIC) =====
+    aggregate_by_reference: bool = Field(
+        False,
+        description="Group results by reference variant and calculate statistics",
+    )
+
+    min_nearby_variants: Optional[int] = Field(
+        None,
+        ge=1,
+        description="HAVING: Minimum number of nearby variants per reference (requires aggregate_by_reference=true)",
+    )
+
+    max_nearby_variants: Optional[int] = Field(
+        None,
+        ge=1,
+        description="HAVING: Maximum number of nearby variants per reference (requires aggregate_by_reference=true)",
+    )
+
+    min_avg_distance: Optional[float] = Field(
+        None,
+        ge=0,
+        description="HAVING: Minimum average distance to nearby variants (requires aggregate_by_reference=true)",
+    )
+
+    max_avg_distance: Optional[float] = Field(
+        None,
+        ge=0,
+        description="HAVING: Maximum average distance to nearby variants (requires aggregate_by_reference=true)",
+    )
+
+    # ===== MULTI-LEVEL LIMITS =====
+    max_reference_variants: Optional[int] = Field(
+        None,
+        ge=1,
+        le=100000,
+        description="LIMIT: Maximum number of reference variants to process",
+    )
+
+    reference_sort_by: Optional[str] = Field(
+        None,
+        description="How to sort reference variants before limiting",
+    )
+
+    reference_sort_order: SortOrder = Field(
+        SortOrder.asc,
+        description="Sort order for reference variants",
+    )
+
+    max_nearby_per_reference: Optional[int] = Field(
+        None,
+        ge=1,
+        le=10000,
+        description="LIMIT: Maximum nearby variants per reference variant",
+    )
+
+    nearby_sort_by: Optional[str] = Field(
+        "distance",
+        description="How to sort nearby variants per reference (default: distance)",
+    )
+
+    nearby_sort_order: SortOrder = Field(
+        SortOrder.asc,
+        description="Sort order for nearby variants per reference",
+    )
+
+    # Sorting and pagination (final output)
     sort_by: Optional[str] = Field(
-        "distance", description="Column to sort by (e.g., 'distance', 'hugo_symbol')"
+        "distance",
+        description="Column to sort final results by",
     )
 
-    sort_order: SortOrder = Field(SortOrder.ASC, description="Sort direction")
+    sort_order: SortOrder = Field(
+        SortOrder.asc,
+        description="Sort direction for final results",
+    )
 
     page: int = Field(1, ge=1, description="Page number")
     page_size: int = Field(100, ge=1, le=10000, description="Results per page")
 
-    @field_validator("reference_gene")
+    # Validators
+    @field_validator("max_proximity_distance")
     @classmethod
-    def validate_reference_gene(cls, v, info):
-        """Validate reference_gene is provided when needed"""
-        ref_type = info.data.get("reference_variant_type")
-        if ref_type == ReferenceVariantType.specific_gene and not v:
-            raise ValueError("reference_gene is required for 'specific_gene' type")
+    def validate_max_distance(cls, v, info):
+        """Validate max_proximity_distance for range mode"""
+        distance_mode = info.data.get("distance_mode")
+        proximity_distance = info.data.get("proximity_distance")
+
+        if distance_mode == DistanceMode.range:
+            if not v:
+                raise ValueError("max_proximity_distance is required for 'range' mode")
+            if v <= proximity_distance:
+                raise ValueError(
+                    "max_proximity_distance must be greater than proximity_distance"
+                )
         return v
 
-    @field_validator("reference_filters")
+    @field_validator(
+        "min_nearby_variants",
+        "max_nearby_variants",
+        "min_avg_distance",
+        "max_avg_distance",
+    )
     @classmethod
-    def validate_reference_filters(cls, v, info):
-        """Validate reference_filters is provided when needed"""
-        ref_type = info.data.get("reference_variant_type")
-        if ref_type == ReferenceVariantType.custom_filter and not v:
-            raise ValueError("reference_filters is required for 'custom_filter' type")
+    def validate_having_requires_aggregation(cls, v, info):
+        """HAVING clauses require aggregation"""
+        if v is not None:
+            aggregate_by_reference = info.data.get("aggregate_by_reference")
+            if not aggregate_by_reference:
+                raise ValueError(
+                    "HAVING filters (min_nearby_variants, max_nearby_variants, etc.) "
+                    "require aggregate_by_reference=true"
+                )
         return v
 
 
 class ProximityVariantResponse(BaseModel):
     """Response model for proximity variant search"""
 
-    dataset: str
-    reference_variant_type: str
-    reference_gene: Optional[str] = None
-    proximity_bp: int
     direction: str
-    total_reference_variants: int
+    table_name: str
+    distance_mode: str
+    distance_unit: str
+    proximity_distance: int
+    aggregate_by_reference: bool
+    max_proximity_distance: Optional[int] = None
+
+    # Counts
+    total_results: int
     total_query_variants: int
+    total_reference_variants: int
+
+    # Pagination
     page: int
     page_size: int
-    sort_by: Optional[str] = None
+
+    # Sorting
     sort_order: str
+    sort_by: Optional[str] = None
+
+    # Results
     results: List[Dict[str, Any]]
 
 
@@ -168,104 +273,97 @@ def _normalize_chromosome(chrom: str) -> str:
     return chrom_str
 
 
-def _build_reference_filter(
-    model_class,
-    reference_variant_type: ReferenceVariantType,
-    reference_gene: Optional[str],
-    reference_filters: Optional[ComplexFilter],
-):
-    """
-    Build filter expression for reference variants.
-
-    Args:
-        model_class: SQLAlchemy model class
-        reference_variant_type: Type of reference variants
-        reference_gene: Gene symbol (if applicable)
-        reference_filters: Custom filters (if applicable)
-
-    Returns:
-        SQLAlchemy filter expression
-    """
-    from app.core import _build_filter_expression
-
-    conditions = []
-
-    if reference_variant_type == ReferenceVariantType.frameshift:
-        if hasattr(model_class, "variant_classification"):
-            conditions.append(
-                model_class.variant_classification.in_(
-                    [
-                        "Frame_Shift_Del",
-                        "Frame_Shift_Ins",
-                        "Frameshift_Deletion",
-                        "Frameshift_Insertion",
-                    ]
-                )
-            )
-
-    elif reference_variant_type == ReferenceVariantType.nonsense:
-        if hasattr(model_class, "variant_classification"):
-            conditions.append(
-                model_class.variant_classification.in_(
-                    ["Nonsense_Mutation", "Nonstop_Mutation"]
-                )
-            )
-
-    elif reference_variant_type == ReferenceVariantType.splice_site:
-        if hasattr(model_class, "variant_classification"):
-            conditions.append(
-                model_class.variant_classification.in_(["Splice_Site", "Splice_Region"])
-            )
-
-    elif reference_variant_type == ReferenceVariantType.missense:
-        if hasattr(model_class, "variant_classification"):
-            conditions.append(model_class.variant_classification == "Missense_Mutation")
-
-    elif reference_variant_type == ReferenceVariantType.specific_gene:
-        if hasattr(model_class, "gene") and reference_gene:
-            conditions.append(model_class.gene == reference_gene)
-
-    elif reference_variant_type == ReferenceVariantType.custom_filter:
-        if reference_filters:
-            custom_expr = _build_filter_expression(model_class, reference_filters)
-            if custom_expr is not None:
-                conditions.append(custom_expr)
-
-    if not conditions:
-        # Default: return True (no filtering)
-        return True
-
-    return and_(*conditions) if len(conditions) > 1 else conditions[0]
+def _convert_distance_to_bp(distance: int, unit: DistanceUnit) -> int:
+    """Convert distance from specified unit to base pairs."""
+    if unit == DistanceUnit.bp:
+        return distance
+    elif unit == DistanceUnit.kb:
+        return distance * 1000
+    elif unit == DistanceUnit.mb:
+        return distance * 1000000
+    elif unit == DistanceUnit.codon:
+        return distance * 3
+    return distance
 
 
 def _calculate_distance(
     ref_pos: int, query_pos: int, direction: ProximityDirection
 ) -> Optional[int]:
-    """
-    Calculate distance based on direction.
-
-    Args:
-        ref_pos: Reference position
-        query_pos: Query position
-        direction: Direction constraint
-
-    Returns:
-        Distance (positive) or None if direction doesn't match
-    """
+    """Calculate distance based on direction."""
     if direction == ProximityDirection.upstream:
-        # Query must be upstream (lower position)
         if query_pos < ref_pos:
             return ref_pos - query_pos
         return None
-
     elif direction == ProximityDirection.downstream:
-        # Query must be downstream (higher position)
         if query_pos > ref_pos:
             return query_pos - ref_pos
         return None
-
     else:  # both
         return abs(ref_pos - query_pos)
+
+
+def _validate_distance(
+    distance: Optional[int],
+    distance_mode: DistanceMode,
+    min_distance_bp: int,
+    max_distance_bp: Optional[int],
+) -> bool:
+    """Validate if a distance matches the distance mode criteria."""
+    if distance is None:
+        return False
+
+    if distance_mode == DistanceMode.within:
+        return distance <= min_distance_bp
+    elif distance_mode == DistanceMode.beyond:
+        return distance >= min_distance_bp
+    elif distance_mode == DistanceMode.exact:
+        return abs(distance - min_distance_bp) <= 1
+    elif distance_mode == DistanceMode.range:
+        if max_distance_bp is None:
+            return False
+        return min_distance_bp <= distance <= max_distance_bp
+    return False
+
+
+def _apply_having_filters(
+    aggregated_data: Dict[str, Dict[str, Any]], request: ProximityVariantRequest
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Apply HAVING-like filters to aggregated data.
+
+    Args:
+        aggregated_data: Dict mapping reference key to aggregated stats
+        request: Request with HAVING parameters
+
+    Returns:
+        Filtered aggregated data
+    """
+    filtered = {}
+
+    for ref_key, ref_data in aggregated_data.items():
+        nearby_count = ref_data["nearby_count"]
+        avg_distance = ref_data["avg_distance"]
+
+        # HAVING: min_nearby_variants
+        if request.min_nearby_variants and nearby_count < request.min_nearby_variants:
+            continue
+
+        # HAVING: max_nearby_variants
+        if request.max_nearby_variants and nearby_count > request.max_nearby_variants:
+            continue
+
+        # HAVING: min_avg_distance
+        if request.min_avg_distance and avg_distance < request.min_avg_distance:
+            continue
+
+        # HAVING: max_avg_distance
+        if request.max_avg_distance and avg_distance > request.max_avg_distance:
+            continue
+
+        # Passed all HAVING filters
+        filtered[ref_key] = ref_data
+
+    return filtered
 
 
 # ==========================================
@@ -277,76 +375,58 @@ async def proximity_variant_finder(
     request: ProximityVariantRequest, table_name: str, db
 ) -> ProximityVariantResponse:
     """
-    Find variants in proximity to reference variants.
+    Find variants in proximity to reference variants with aggregation and multi-level limits.
 
-    This tool identifies variants that are within a specified distance of
-    reference variants (e.g., find SNPs near frameshift mutations).
-
-    Algorithm:
-    1. Identify reference variants based on filters
-    2. For each reference variant, find query variants within proximity
-    3. Calculate distance and filter by direction
-    4. Return results with distance information
-
-    Args:
-        request: ProximityVariantRequest with search parameters
-        table_name: Dataset table name
-        db: Database session
-
-    Returns:
-        ProximityVariantResponse with nearby variants
+    Enhanced Features:
+    ------------------
+    1. HAVING-like aggregation filters
+    2. Multi-level limits (reference, per-reference, final)
 
     Example Requests:
     -----------------
 
-    1. Find Variants Near Frameshift Mutations:
+    1. Find reference mutations with >5 nearby variants (HAVING logic):
     {
-      "dataset": "nibmg_exome_somatic",
-      "reference_variant_type": "frameshift",
-      "proximity_bp": 300,
-      "direction": "both",
-      "exclude_reference": true,
-      "sort_by": "distance",
-      "sort_order": "asc"
-    }
-
-    2. Find Variants Near TP53 Mutations:
-    {
-      "dataset": "tcga_exome_somatic",
-      "reference_variant_type": "specific_gene",
-      "reference_gene": "TP53",
-      "proximity_bp": 500,
-      "direction": "both",
-      "same_gene_only": true
-    }
-
-    3. Find Variants Upstream of Splice Sites:
-    {
-      "dataset": "nibmg_exome_somatic",
-      "reference_variant_type": "splice_site",
-      "proximity_bp": 50,
-      "direction": "upstream",
-      "query_filters": {
-        "logic": "AND",
+      "reference_filters": {
         "conditions": [
-          {"column": "variant_type", "operator": "eq", "value": "SNP"}
+          {"column": "variant_class", "operator": "in",
+           "value": ["Frame_Shift_Del", "Frame_Shift_Ins"]}
         ]
-      }
+      },
+      "proximity_distance": 300,
+      "distance_unit": "bp",
+      "aggregate_by_reference": true,
+      "min_nearby_variants": 5,
+      "max_avg_distance": 200
     }
 
-    4. Custom Reference Filter:
+    2. Top 10 references with most nearby variants (multi-level limits):
     {
-      "dataset": "tcga_exome_somatic",
-      "reference_variant_type": "custom_filter",
+      "reference_filters": {
+        "conditions": [
+          {"column": "gene", "operator": "eq", "value": "TP53"}
+        ]
+      },
+      "proximity_distance": 500,
+      "aggregate_by_reference": true,
+      "max_reference_variants": 10,
+      "reference_sort_by": "start",
+      "max_nearby_per_reference": 5
+    }
+
+    3. Find variants within 300bp of specific mutation:
+    {
       "reference_filters": {
         "logic": "AND",
         "conditions": [
-          {"column": "hugo_symbol", "operator": "in", "value": ["BRCA1", "BRCA2"]},
-          {"column": "variant_classification", "operator": "eq", "value": "Missense_Mutation"}
+          {"column": "gene", "operator": "eq", "value": "TP53"},
+          {"column": "protein_change", "operator": "like", "value": "%W146fs%"}
         ]
       },
-      "proximity_bp": 200,
-      "direction": "both"
+      "proximity_distance": 300,
+      "distance_unit": "bp",
+      "direction": "both",
+      "exclude_reference": true
     }
     """
 
@@ -354,140 +434,229 @@ async def proximity_variant_finder(
         model_class = get_model_class(table_name)
 
         # Validate required columns
-        required_cols = ["start", "chrom"]
-        if not all(hasattr(model_class, col) for col in required_cols):
-            # Try alternative column names
-            if not hasattr(model_class, "start") and not hasattr(
-                model_class, "start_position"
-            ):
-                raise HTTPException(
-                    status_code=400,
-                    detail="Model must have 'start' or 'start_position' column",
-                )
-            if not hasattr(model_class, "chrom") and not hasattr(
-                model_class, "chromosome"
-            ):
-                raise HTTPException(
-                    status_code=400,
-                    detail="Model must have 'chrom' or 'chromosome' column",
-                )
+        pos_col_name = None
+        for col_name in ["start", "start_position", "pos"]:
+            if hasattr(model_class, col_name):
+                pos_col_name = col_name
+                break
+        if not pos_col_name:
+            raise HTTPException(400, "Dataset must have position column")
 
-        # Determine column names
-        pos_col = (
-            model_class.start
-            if hasattr(model_class, "start")
-            else model_class.start_position
-        )
-        chrom_col = (
-            model_class.chrom
-            if hasattr(model_class, "chrom")
-            else model_class.chromosome
-        )
+        chr_col_name = None
+        for col_name in ["chrom", "chromosome", "chr"]:
+            if hasattr(model_class, col_name):
+                chr_col_name = col_name
+                break
+        if not chr_col_name:
+            raise HTTPException(400, "Dataset must have chromosome column")
 
-        # Step 1: Get reference variants
+        pos_col = getattr(model_class, pos_col_name)
+        chr_col = getattr(model_class, chr_col_name)
+
+        # Gene column (optional)
+        gene_col_name = None
+        for col_name in ["hugo_symbol", "gene", "gene_symbol"]:
+            if hasattr(model_class, col_name):
+                gene_col_name = col_name
+                break
+
+        # Convert distances to bp
+        min_distance_bp = _convert_distance_to_bp(
+            request.proximity_distance, request.distance_unit
+        )
+        max_distance_bp = None
+        if request.max_proximity_distance:
+            max_distance_bp = _convert_distance_to_bp(
+                request.max_proximity_distance, request.distance_unit
+            )
+
+        # ===== STEP 1: GET REFERENCE VARIANTS WITH LIMITS =====
         ref_query = db.query(model_class)
 
-        # Apply chromosome filter if specified
+        # Apply chromosome filter
         if request.chromosome:
             norm_chrom = _normalize_chromosome(request.chromosome)
             ref_query = ref_query.filter(
                 or_(
-                    chrom_col == norm_chrom,
-                    chrom_col == f"chr{norm_chrom}",
-                    chrom_col == request.chromosome,
+                    chr_col == norm_chrom,
+                    chr_col == f"chr{norm_chrom}",
+                    chr_col == request.chromosome,
                 )
             )
 
         # Apply reference filters
-        ref_filter = _build_reference_filter(
-            model_class,
-            request.reference_variant_type,
-            request.reference_gene,
-            request.reference_filters,
-        )
+        ref_query = apply_filters(ref_query, model_class, request.reference_filters)
 
-        if ref_filter is not True:
-            ref_query = ref_query.filter(ref_filter)
+        # Sort reference variants (for limit)
+        if request.reference_sort_by and hasattr(
+            model_class, request.reference_sort_by
+        ):
+            sort_col = getattr(model_class, request.reference_sort_by)
+            if request.reference_sort_order == SortOrder.desc:
+                ref_query = ref_query.order_by(sort_col.desc())
+            else:
+                ref_query = ref_query.order_by(sort_col.asc())
 
-        # Get reference variants
-        reference_variants = ref_query.all()
-        total_reference_variants = len(reference_variants)
+        # Get total count
+        total_reference_variants = ref_query.count()
 
-        if total_reference_variants == 0:
+        # Apply limit to reference variants if specified
+        if request.max_reference_variants:
+            reference_variants = ref_query.limit(request.max_reference_variants).all()
+        else:
+            reference_variants = ref_query.all()
+
+        if len(reference_variants) == 0:
             return ProximityVariantResponse(
-                dataset=request.dataset,
-                reference_variant_type=request.reference_variant_type.value,
-                reference_gene=request.reference_gene,
-                proximity_bp=request.proximity_bp,
-                direction=request.direction.value,
-                total_reference_variants=0,
-                total_query_variants=0,
-                page=request.page,
-                page_size=request.page_size,
-                sort_by=request.sort_by,
-                sort_order=request.sort_order.value,
                 results=[],
+                total_results=0,
+                page=request.page,
+                table_name=table_name,
+                total_query_variants=0,
+                sort_by=request.sort_by,
+                total_reference_variants=0,
+                page_size=request.page_size,
+                direction=request.direction.value,
+                sort_order=request.sort_order.value,
+                distance_mode=request.distance_mode.value,
+                distance_unit=request.distance_unit.value,
+                proximity_distance=request.proximity_distance,
+                max_proximity_distance=request.max_proximity_distance,
+                aggregate_by_reference=request.aggregate_by_reference,
             )
 
-        # Step 2: Find query variants near each reference
+        # ===== STEP 2: FIND NEARBY VARIANTS FOR EACH REFERENCE =====
         nearby_variants = []
+        aggregated_data = {}
 
         for ref_variant in reference_variants:
-            ref_chrom = getattr(
-                ref_variant, "chrom" if hasattr(ref_variant, "chrom") else "chromosome"
-            )
-            # Get position value
-            ref_pos_raw = getattr(
-                ref_variant,
-                "start" if hasattr(ref_variant, "start") else "start_position",
-            )
+            ref_chrom = getattr(ref_variant, chr_col_name)
 
-            # Convert to integer (handle string or numeric types)
+            # Get position
+            ref_pos_raw = getattr(ref_variant, pos_col_name)
             try:
                 ref_pos = int(ref_pos_raw)
             except (ValueError, TypeError):
-                # Skip this reference variant if position is invalid
                 continue
 
-            ref_gene = (
-                getattr(ref_variant, "gene", None)
-                if hasattr(ref_variant, "gene")
-                else None
-            )
+            # Extract reference variant details (for aggregation)
+            ref_gene = getattr(ref_variant, "gene")
+            ref_variant_type = getattr(ref_variant, "variant_type")
+            ref_genome_change = getattr(ref_variant, "genome_change")
+            ref_variant_class = getattr(ref_variant, "variant_class")
+            ref_protein_change = getattr(ref_variant, "protein_change")
 
             # Build query for nearby variants
             query_query = db.query(model_class)
 
             # Same chromosome
-            query_query = query_query.filter(chrom_col == ref_chrom)
+            if request.same_chromosome_only:
+                query_query = query_query.filter(chr_col == ref_chrom)
 
-            # Position proximity based on direction
-            if request.direction == ProximityDirection.upstream:
-                # Query variants upstream (lower position)
-                query_query = query_query.filter(
-                    and_(pos_col < ref_pos, pos_col >= ref_pos - request.proximity_bp)
-                )
-            elif request.direction == ProximityDirection.downstream:
-                # Query variants downstream (higher position)
-                query_query = query_query.filter(
-                    and_(pos_col > ref_pos, pos_col <= ref_pos + request.proximity_bp)
-                )
-            else:  # both
-                query_query = query_query.filter(
-                    and_(
-                        pos_col >= ref_pos - request.proximity_bp,
-                        pos_col <= ref_pos + request.proximity_bp,
+            # Position filtering based on distance mode
+            if request.distance_mode == DistanceMode.within:
+                if request.direction == ProximityDirection.upstream:
+                    query_query = query_query.filter(
+                        and_(pos_col < ref_pos, pos_col >= ref_pos - min_distance_bp)
                     )
-                )
+                elif request.direction == ProximityDirection.downstream:
+                    query_query = query_query.filter(
+                        and_(pos_col > ref_pos, pos_col <= ref_pos + min_distance_bp)
+                    )
+                else:
+                    query_query = query_query.filter(
+                        and_(
+                            pos_col >= ref_pos - min_distance_bp,
+                            pos_col <= ref_pos + min_distance_bp,
+                        )
+                    )
 
-            # Exclude reference variant itself if requested
+            elif request.distance_mode == DistanceMode.beyond:
+                if request.direction == ProximityDirection.upstream:
+                    query_query = query_query.filter(
+                        pos_col <= ref_pos - min_distance_bp
+                    )
+                elif request.direction == ProximityDirection.downstream:
+                    query_query = query_query.filter(
+                        pos_col >= ref_pos + min_distance_bp
+                    )
+                else:
+                    query_query = query_query.filter(
+                        or_(
+                            pos_col <= ref_pos - min_distance_bp,
+                            pos_col >= ref_pos + min_distance_bp,
+                        )
+                    )
+
+            elif request.distance_mode == DistanceMode.exact:
+                if request.direction == ProximityDirection.upstream:
+                    query_query = query_query.filter(
+                        and_(
+                            pos_col >= ref_pos - min_distance_bp - 1,
+                            pos_col <= ref_pos - min_distance_bp + 1,
+                        )
+                    )
+                elif request.direction == ProximityDirection.downstream:
+                    query_query = query_query.filter(
+                        and_(
+                            pos_col >= ref_pos + min_distance_bp - 1,
+                            pos_col <= ref_pos + min_distance_bp + 1,
+                        )
+                    )
+                else:
+                    query_query = query_query.filter(
+                        or_(
+                            and_(
+                                pos_col >= ref_pos - min_distance_bp - 1,
+                                pos_col <= ref_pos - min_distance_bp + 1,
+                            ),
+                            and_(
+                                pos_col >= ref_pos + min_distance_bp - 1,
+                                pos_col <= ref_pos + min_distance_bp + 1,
+                            ),
+                        )
+                    )
+
+            elif request.distance_mode == DistanceMode.range:
+                if max_distance_bp is None:
+                    continue
+
+                if request.direction == ProximityDirection.upstream:
+                    query_query = query_query.filter(
+                        and_(
+                            pos_col <= ref_pos - min_distance_bp,
+                            pos_col >= ref_pos - max_distance_bp,
+                        )
+                    )
+                elif request.direction == ProximityDirection.downstream:
+                    query_query = query_query.filter(
+                        and_(
+                            pos_col >= ref_pos + min_distance_bp,
+                            pos_col <= ref_pos + max_distance_bp,
+                        )
+                    )
+                else:
+                    query_query = query_query.filter(
+                        or_(
+                            and_(
+                                pos_col <= ref_pos - min_distance_bp,
+                                pos_col >= ref_pos - max_distance_bp,
+                            ),
+                            and_(
+                                pos_col >= ref_pos + min_distance_bp,
+                                pos_col <= ref_pos + max_distance_bp,
+                            ),
+                        )
+                    )
+
+            # Exclude reference
             if request.exclude_reference:
-                # Exclude exact position match
                 query_query = query_query.filter(pos_col != ref_pos)
 
             # Same gene only
-            if request.same_gene_only and ref_gene and hasattr(model_class, "gene"):
-                query_query = query_query.filter(model_class.gene == ref_gene)
+            if request.same_gene_only and ref_gene and gene_col_name:
+                gene_col = getattr(model_class, gene_col_name)
+                query_query = query_query.filter(gene_col == ref_gene)
 
             # Apply query filters
             if request.query_filters:
@@ -495,219 +664,255 @@ async def proximity_variant_finder(
                     query_query, model_class, request.query_filters
                 )
 
+            # Sort nearby variants per reference
+            if request.nearby_sort_by:
+                if request.nearby_sort_by == "distance":
+                    # Will sort by distance after calculation
+                    pass
+                elif hasattr(model_class, request.nearby_sort_by):
+                    sort_col = getattr(model_class, request.nearby_sort_by)
+                    if request.nearby_sort_order == SortOrder.desc:
+                        query_query = query_query.order_by(sort_col.desc())
+                    else:
+                        query_query = query_query.order_by(sort_col.asc())
+
             # Execute query
             query_variants = query_query.all()
 
-            # Calculate distances and add to results
+            # Calculate distances and create variant objects
+            ref_nearby_variants = []
             for query_variant in query_variants:
-                query_pos_raw = getattr(
-                    query_variant,
-                    "start" if hasattr(query_variant, "start") else "start_position",
-                )
-
-                # Convert to integer (handle string or numeric types)
+                query_pos_raw = getattr(query_variant, pos_col_name)
                 try:
                     query_pos = int(query_pos_raw)
                 except (ValueError, TypeError):
-                    # Skip this query variant if position is invalid
                     continue
 
-                # Calculate distance based on direction
-                distance = _calculate_distance(ref_pos, query_pos, request.direction)
+                distance_bp = _calculate_distance(ref_pos, query_pos, request.direction)
 
-                if distance is not None and distance <= request.proximity_bp:
-                    variant_dict = row_to_dict(query_variant)
+                if not _validate_distance(
+                    distance_bp, request.distance_mode, min_distance_bp, max_distance_bp
+                ):
+                    continue
 
-                    # Add proximity metadata
-                    variant_dict["distance"] = distance
-                    variant_dict["reference_position"] = ref_pos
-                    variant_dict["reference_gene"] = ref_gene
+                variant_dict = row_to_dict(query_variant)
 
-                    # Add relative direction
-                    if query_pos < ref_pos:
-                        variant_dict["relative_direction"] = "upstream"
-                    elif query_pos > ref_pos:
-                        variant_dict["relative_direction"] = "downstream"
-                    else:
-                        variant_dict["relative_direction"] = "same"
+                # Convert distance to requested unit
+                if request.distance_unit == DistanceUnit.kb:
+                    distance_display = round(distance_bp / 1000, 3)
+                elif request.distance_unit == DistanceUnit.mb:
+                    distance_display = round(distance_bp / 1000000, 6)
+                elif request.distance_unit == DistanceUnit.codon:
+                    distance_display = distance_bp // 3
+                else:
+                    distance_display = distance_bp
 
-                    nearby_variants.append(variant_dict)
+                variant_dict["distance_bp"] = distance_bp
+                variant_dict["reference_gene"] = ref_gene
+                variant_dict["distance"] = distance_display
+                variant_dict["reference_position"] = ref_pos
+                variant_dict["reference_chromosome"] = ref_chrom
+                variant_dict["distance_unit"] = request.distance_unit.value
 
-        # Remove duplicates (same variant near multiple references)
-        # Keep the one with smallest distance
-        unique_variants = {}
-        for variant in nearby_variants:
-            # Create unique key (chromosome + position)
-            key = f"{variant.get('chrom', variant.get('chromosome'))}:{variant.get('start', variant.get('start_position'))}"
+                if query_pos < ref_pos:
+                    variant_dict["relative_direction"] = "upstream"
+                elif query_pos > ref_pos:
+                    variant_dict["relative_direction"] = "downstream"
+                else:
+                    variant_dict["relative_direction"] = "same"
 
-            if (
-                key not in unique_variants
-                or variant["distance"] < unique_variants[key]["distance"]
-            ):
-                unique_variants[key] = variant
+                ref_nearby_variants.append(variant_dict)
 
-        nearby_variants = list(unique_variants.values())
+            # Sort by distance if requested
+            if request.nearby_sort_by == "distance":
+                ref_nearby_variants = sorted(
+                    ref_nearby_variants,
+                    key=lambda x: x["distance_bp"],
+                    reverse=(request.nearby_sort_order == SortOrder.desc),
+                )
+
+            # Limit nearby per reference
+            if request.max_nearby_per_reference:
+                ref_nearby_variants = ref_nearby_variants[
+                    : request.max_nearby_per_reference
+                ]
+
+            # Store for aggregation or add to results
+            if request.aggregate_by_reference:
+                # Aggregate by reference
+                ref_key = f"{ref_chrom}:{ref_pos}"
+                if ref_nearby_variants:
+                    aggregated_data[ref_key] = {
+                        "reference": {
+                            "gene": ref_gene,
+                            "position": ref_pos,
+                            "chromosome": ref_chrom,
+                            "variant_type": ref_variant_type,
+                            "genome_change": ref_genome_change,
+                            "variant_class": ref_variant_class,
+                            "protein_change": ref_protein_change,
+                        },
+                        "nearby_count": len(ref_nearby_variants),
+                        "avg_distance": sum(
+                            v["distance_bp"] for v in ref_nearby_variants
+                        )
+                        / len(ref_nearby_variants),
+                        "min_distance": min(
+                            v["distance_bp"] for v in ref_nearby_variants
+                        ),
+                        "max_distance": max(
+                            v["distance_bp"] for v in ref_nearby_variants
+                        ),
+                        "nearby_variants": ref_nearby_variants,
+                    }
+            else:
+                # No aggregation - add all nearby variants
+                nearby_variants.extend(ref_nearby_variants)
+
+        # ===== STEP 3: APPLY HAVING FILTERS (IF AGGREGATED) =====
+        if request.aggregate_by_reference:
+            aggregated_data = _apply_having_filters(aggregated_data, request)
+
+            # Convert aggregated data to result format
+            nearby_variants = []
+            for ref_key, ref_data in aggregated_data.items():
+                nearby_variants.append(
+                    {
+                        "reference": ref_data["reference"],
+                        "nearby_count": ref_data["nearby_count"],
+                        "min_distance": ref_data["min_distance"],
+                        "max_distance": ref_data["max_distance"],
+                        "nearby_variants": ref_data["nearby_variants"],
+                        "avg_distance": round(ref_data["avg_distance"], 2),
+                    }
+                )
+
+        # ===== STEP 4: REMOVE DUPLICATES (IF NOT AGGREGATED) =====
+        if not request.aggregate_by_reference:
+            unique_variants = {}
+            for variant in nearby_variants:
+                key = f"{variant.get(chr_col_name)}:{variant.get(pos_col_name)}"
+                if (
+                    key not in unique_variants
+                    or variant["distance_bp"] < unique_variants[key]["distance_bp"]
+                ):
+                    unique_variants[key] = variant
+            nearby_variants = list(unique_variants.values())
+
         total_query_variants = len(nearby_variants)
 
-        # Step 3: Sort results
-        if request.sort_by:
-            reverse = request.sort_order == SortOrder.DESC
+        # ===== STEP 5: SORT FINAL RESULTS =====
+        if request.sort_by and not request.aggregate_by_reference:
+            reverse = request.sort_order == SortOrder.desc
             try:
                 nearby_variants = sorted(
                     nearby_variants,
-                    key=lambda x: x.get(request.sort_by, 0)
-                    if x.get(request.sort_by) is not None
-                    else 0,
+                    key=lambda x: (
+                        x.get(request.sort_by, 0)
+                        if x.get(request.sort_by) is not None
+                        else 0
+                    ),
                     reverse=reverse,
                 )
-            except Exception as e:
-                # Fallback to distance sorting
+            except Exception:
                 nearby_variants = sorted(
-                    nearby_variants, key=lambda x: x.get("distance", 0)
+                    nearby_variants, key=lambda x: x.get("distance_bp", 0)
+                )
+        elif request.aggregate_by_reference:
+            # Sort aggregated results
+            if request.sort_by == "nearby_count":
+                nearby_variants = sorted(
+                    nearby_variants,
+                    key=lambda x: x["nearby_count"],
+                    reverse=(request.sort_order == SortOrder.desc),
+                )
+            elif request.sort_by == "avg_distance":
+                nearby_variants = sorted(
+                    nearby_variants,
+                    key=lambda x: x["avg_distance"],
+                    reverse=(request.sort_order == SortOrder.desc),
                 )
 
-        # Step 4: Pagination
+        # ===== STEP 6: PAGINATION =====
         offset = (request.page - 1) * request.page_size
         paginated_results = nearby_variants[offset : offset + request.page_size]
 
         return ProximityVariantResponse(
-            dataset=request.dataset,
-            reference_variant_type=request.reference_variant_type.value,
-            reference_gene=request.reference_gene,
-            proximity_bp=request.proximity_bp,
-            direction=request.direction.value,
-            total_reference_variants=total_reference_variants,
-            total_query_variants=total_query_variants,
             page=request.page,
-            page_size=request.page_size,
+            table_name=table_name,
             sort_by=request.sort_by,
-            sort_order=request.sort_order.value,
             results=paginated_results,
+            page_size=request.page_size,
+            direction=request.direction.value,
+            total_results=total_query_variants,
+            sort_order=request.sort_order.value,
+            distance_mode=request.distance_mode.value,
+            distance_unit=request.distance_unit.value,
+            total_query_variants=total_query_variants,
+            proximity_distance=request.proximity_distance,
+            total_reference_variants=total_reference_variants,
+            max_proximity_distance=request.max_proximity_distance,
+            aggregate_by_reference=request.aggregate_by_reference,
         )
 
     except HTTPException as he:
         raise he
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Proximity variant search failed: {str(e)}"
-        )
+        raise HTTPException(500, f"Proximity variant search failed: {str(e)}")
 
 
 # ==========================================
-# EXAMPLE USAGE
+# USAGE EXAMPLES
 # ==========================================
 
 """
-Example Integration in FastAPI Router:
----------------------------------------
-
-from proximity_variant_finder import (
-    proximity_variant_finder,
-    ProximityVariantRequest,
-    ProximityVariantResponse
-)
-
-@router.post("/proximity_variant_finder", response_model=ProximityVariantResponse)
-async def find_nearby_variants(
-    table_name: str,
-    request: ProximityVariantRequest,
-    db: Session = Depends(get_db)
-):
-    return await proximity_variant_finder(request, table_name, db)
-
-
-Example cURL Requests:
-----------------------
-
-1. Find SNPs near frameshift mutations in TP53:
-curl -X POST "http://localhost:8000/proximity_variant_finder?table_name=tcga_exome_somatic_variants" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "dataset": "tcga_exome_somatic",
-    "reference_variant_type": "frameshift",
-    "proximity_bp": 300,
-    "direction": "both",
-    "query_filters": {
-      "logic": "AND",
-      "conditions": [
-        {"column": "hugo_symbol", "operator": "eq", "value": "TP53"},
-        {"column": "variant_type", "operator": "eq", "value": "SNP"}
-      ]
-    },
-    "same_gene_only": true,
-    "sort_by": "distance",
-    "sort_order": "asc",
-    "page_size": 50
-  }'
-
-2. Find variants within 50bp upstream of splice sites:
-curl -X POST "http://localhost:8000/proximity_variant_finder?table_name=nibmg_exome_somatic_variants" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "dataset": "nibmg_exome_somatic",
-    "reference_variant_type": "splice_site",
-    "proximity_bp": 50,
-    "direction": "upstream",
-    "exclude_reference": true,
-    "page_size": 100
-  }'
-
-3. Find clustered variants (variants near other variants):
-curl -X POST "http://localhost:8000/proximity_variant_finder?table_name=tcga_exome_somatic_variants" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "dataset": "tcga_exome_somatic",
-    "reference_variant_type": "custom_filter",
-    "reference_filters": {
-      "logic": "AND",
-      "conditions": [
-        {"column": "variant_classification", "operator": "in", 
-         "value": ["Missense_Mutation", "Nonsense_Mutation"]}
-      ]
-    },
-    "proximity_bp": 100,
-    "direction": "both",
-    "exclude_reference": true,
-    "chromosome": "17"
-  }'
-
-Expected Response:
------------------
+Example 1: HAVING Logic - Find frameshifts with >5 nearby variants
+--------------------------------------------------------------------
 {
-  "dataset": "tcga_exome_somatic",
-  "reference_variant_type": "frameshift",
-  "reference_gene": null,
-  "proximity_bp": 300,
+  "reference_filters": {
+    "logic": "AND",
+    "conditions": [
+      {"column": "variant_class", "operator": "in", 
+       "value": ["Frame_Shift_Del", "Frame_Shift_Ins"]}
+    ]
+  },
+  "proximity_distance": 300,
+  "distance_unit": "bp",
+  "aggregate_by_reference": true,
+  "min_nearby_variants": 5,
+  "max_avg_distance": 200,
+  "sort_by": "nearby_count",
+  "sort_order": "desc"
+}
+
+Example 2: Multi-Level Limits - Top 10 references, 5 nearest each
+-------------------------------------------------------------------
+{
+  "reference_filters": {
+    "conditions": [{"column": "gene", "operator": "eq", "value": "TP53"}]
+  },
+  "proximity_distance": 500,
+  "max_reference_variants": 10,
+  "reference_sort_by": "start",
+  "max_nearby_per_reference": 5,
+  "nearby_sort_by": "distance"
+}
+
+Example 3: Simple proximity - Variants within 300bp of specific mutation
+--------------------------------------------------------------------------
+{
+  "reference_filters": {
+    "logic": "AND",
+    "conditions": [
+      {"column": "gene", "operator": "eq", "value": "TP53"},
+      {"column": "protein_change", "operator": "like", "value": "%W146fs%"}
+    ]
+  },
+  "proximity_distance": 300,
+  "distance_unit": "bp",
   "direction": "both",
-  "total_reference_variants": 42,
-  "total_query_variants": 187,
-  "page": 1,
-  "page_size": 50,
+  "exclude_reference": true,
   "sort_by": "distance",
-  "sort_order": "asc",
-  "results": [
-    {
-      "chrom": "17",
-      "start": 7577548,
-      "hugo_symbol": "TP53",
-      "variant_type": "SNP",
-      "variant_classification": "Missense_Mutation",
-      "distance": 15,
-      "reference_position": 7577533,
-      "reference_gene": "TP53",
-      "relative_direction": "downstream"
-    },
-    {
-      "chrom": "17",
-      "start": 7577520,
-      "hugo_symbol": "TP53",
-      "variant_type": "SNP",
-      "variant_classification": "Missense_Mutation",
-      "distance": 13,
-      "reference_position": 7577533,
-      "reference_gene": "TP53",
-      "relative_direction": "upstream"
-    }
-  ]
+  "sort_order": "asc"
 }
 """
