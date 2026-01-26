@@ -22,10 +22,6 @@ synthesizer_agent = Agent(
         - **Visual Structure**: Use bullet points for comparisons or lists to make the data readable.
         - **Empty Results**: If no data is found for a specific dataset, mention it politely (e.g., "No variants matching those criteria were found in the WGS cohort").
 
-        **3. Formatting:**
-        - Use **bolding** for gene names (e.g., **TP53**) and important statistics.
-        - If a sample is provided, present it as: "Here is a representative sample of the variants: ..."
-        - End with a brief, helpful summary of the findings.
 
         **4. Tone:**
         - Professional, scientific, yet accessible. Avoid robotic JSON-like listing.
