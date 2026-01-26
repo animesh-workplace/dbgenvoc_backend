@@ -1,0 +1,30 @@
+{
+  "version": "1.1.0",
+  "last_updated": "2026-01-23T00:17:11.819010",
+  "tools": [
+    {
+      "name": "generic_search",
+      "version": "1.0.0",
+      "priority": 1,
+      "intent_description": "Retrieve rows",
+      "added_in_version": "1.0.0",
+      "new_columns": []
+    },
+    {
+      "name": "generic_aggregate",
+      "version": "1.0.0",
+      "priority": 2,
+      "intent_description": "Count / group / threshold",
+      "added_in_version": "1.0.0",
+      "new_columns": []
+    },
+    {
+      "name": "generic_concatenated_aggregate",
+      "version": "1.0.0",
+      "priority": 3,
+      "intent_description": "Ti/Tv or allele patterns",
+      "added_in_version": "1.0.0",
+      "new_columns": []
+    }
+  ]
+}
