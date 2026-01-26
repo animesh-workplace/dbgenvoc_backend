@@ -1,0 +1,71 @@
+tool_definition:
+  name: "generic_aggregate"
+  description: "Count, group, and threshold aggregation"
+  version: "1.0.0"
+
+  placement:
+    node5_intent_description: "Count / group / threshold"
+    node_priority: 2
+
+  parameters:
+    required:
+      - name: "table_name"
+        type: "str"
+        enum: ["nibmg_exome_somatic_variants", "nibmg_wg_somatic_variants",
+               "tcga_exome_somatic_variants", "journal_exome_somatic_variants"]
+        description: "Source table"
+
+      - name: "aggregation_type"
+        type: "str"
+        enum: ["count", "distinct_count"]
+        description: "Type of aggregation"
+
+      - name: "column"
+        type: "str"
+        description: "Column to aggregate (gene, variant_class, etc.)"
+
+    optional:
+      - name: "filters"
+        type: "ComplexFilter"
+        description: "Pre-aggregation filters"
+
+      - name: "group_by"
+        type: "List[str]"
+        description: "Columns to group by"
+
+      - name: "having"
+        type: "str"
+        description: "Post-aggregation filter (SQL-like)"
+
+      - name: "order_by"
+        type: "str"
+        description: "Sort column (or 'aggregated_value')"
+
+      - name: "order_direction"
+        type: "str"
+        enum: ["asc", "desc"]
+        default: "asc"
+        description: "Sort direction"
+
+      - name: "limit"
+        type: "int"
+        description: "Maximum results to return"
+
+  new_columns: []
+
+  query_context_template: "table_name: {table_name} | aggregation_type: {aggregation_type} | column: {column} | filters: {filters} | group_by: {group_by} | having: {having} | order_by: {order_by} | limit: {limit}"
+
+  example_queries:
+    - "Count variants per gene"
+    - "Find genes with at least 50 mutations"
+    - "Show distribution of variant classes"
+    - "Which samples have mutations in both TP53 and PIK3CA"
+
+  validation_gates:
+    - condition: "having present but group_by is None"
+      error: "HAVING clause requires GROUP BY"
+      action: "return error"
+
+    - condition: "order_by not in group_by and order_by != 'aggregated_value'"
+      error: "order_by must be a grouped column or 'aggregated_value'"
+      action: "return error"
