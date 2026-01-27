@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, and_, or_
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field, field_validator
+from app.abstract import Genelist, Pathway, pathway_gene_association
 from app.core import get_model_class, apply_filters, validate_columns
 from app.schema_new import ComplexFilter, HavingClause, HavingCondition
 
@@ -46,20 +47,40 @@ class GenomicRegion(BaseModel):
 
 class GenomicPositionFilter(BaseModel):
     """
-    Unified genomic filter:
-    - Multiple positions and/or ranges
-    - OR logic across positions
-    - Optional pathway filter
+    Genomic position filtering - unified approach.
     """
 
-    positions: Optional[List[GenomicRegion]] = None
-    pathway: Optional[str] = None
+    positions: Optional[List[GenomicRegion]] = Field(
+        None,
+        description=(
+            "List of genomic positions or ranges. "
+            "Can mix exact positions (start only) and ranges (start + end). "
+            "All conditions combined with OR logic - matches ANY position/range."
+        ),
+    )
 
-    @field_validator("positions")
+    pathway_ids: Optional[List[str]] = Field(
+        None,
+        description=(
+            "Filter by exact pathway IDs from autocomplete. "
+            "Example: ['hsa04151', 'hsa04115'] for KEGG pathways"
+        ),
+    )
+
+    pathway_names: Optional[List[str]] = Field(
+        None,
+        description=(
+            "Filter by pathway names (case-insensitive partial match). "
+            "Returns variants in genes associated with ANY of the specified pathways. "
+            "Examples: ['PI3K-AKT signaling', 'TP53 pathway'] or ['DNA repair']"
+        ),
+    )
+
+    @field_validator("pathway_names")
     @classmethod
-    def validate_positions(cls, v):
+    def validate_pathway_names_not_empty(cls, v):
         if v is not None and len(v) == 0:
-            raise ValueError("positions cannot be empty")
+            raise ValueError("pathway_names list cannot be empty")
         return v
 
 
@@ -123,58 +144,126 @@ def _normalize_chromosome(chrom: str) -> str:
     return chrom[3:] if chrom.startswith("CHR") else chrom
 
 
-def _apply_genomic_position_filter(query, model, genomic_filter):
+def _apply_genomic_position_filter(
+    query, model_class, genomic_filter: Optional[GenomicPositionFilter]
+):
+    """
+    Apply genomic position filtering to query.
+
+    Features:
+    1. Unified positions list - mix ranges and exact positions
+    2. Flexible chromosome naming ('chr17' or '17')
+    3. Overlap detection (if dataset has 'end' column)
+    4. Exact position matching (if no 'end' column)
+    5. Pathway filtering (if pathway column exists)
+    6. OR logic - match ANY position/range
+
+    Args:
+        query: SQLAlchemy query
+        model_class: Model class
+        genomic_filter: GenomicPositionFilter object
+
+    Returns:
+        Filtered query
+
+    Examples:
+        # Query matches variants that satisfy ANY of:
+        # - In chr17:7571000-7572000 (regulatory region)
+        # - At chr17:7577538 (R175H hotspot)
+        # - At chr17:7578406 (R248Q hotspot)
+    """
     if not genomic_filter:
         return query
 
-    chr_col = getattr(model, "chrom", None)
-    pos_col = getattr(model, "start", None)
-    end_col = getattr(model, "end", None)
+    # Detect chromosome and position column names in the dataset
+    chr_col_name = "chrom"
+    pos_col_name = "start"
+    end_col_name = "end"
 
-    if not chr_col or not pos_col:
+    # Validate required columns exist
+    if not chr_col_name or not pos_col_name:
         raise HTTPException(
             400,
-            "Dataset must contain 'chrom' and 'start' columns for genomic filtering",
+            detail=(
+                "Dataset must have chromosome and position columns for genomic filtering. "
+                f"Found columns: {[c.name for c in model_class.__table__.columns]}"
+            ),
         )
 
+    chr_col = getattr(model_class, chr_col_name)
+    pos_col = getattr(model_class, pos_col_name)
+    end_col = getattr(model_class, end_col_name) if end_col_name else None
+
+    # Build genomic position conditions
     conditions = []
 
     if genomic_filter.positions:
         for region in genomic_filter.positions:
-            norm = _normalize_chromosome(region.chromosome)
+            norm_chrom = _normalize_chromosome(region.chromosome)
 
+            # Flexible chromosome matching
+            # Handles: 'chr17', '17', 'CHR17' all match chromosome '17' or 'chr17' in DB
             chrom_cond = or_(
-                chr_col == norm,
-                chr_col == f"chr{norm}",
+                chr_col == norm_chrom,
+                chr_col == f"chr{norm_chrom}",
                 chr_col == region.chromosome,
+                chr_col == region.chromosome.upper(),
+                chr_col == region.chromosome.lower(),
             )
 
             if region.end:
+                # Range query: find overlapping variants
                 if end_col:
-                    pos_cond = and_(
-                        pos_col <= region.end,
-                        end_col >= region.start,
-                    )
+                    # Dataset has end column - check for overlap
+                    # Variants overlap region if: variant.start <= region.end AND variant.end >= region.start
+                    pos_cond = and_(pos_col <= region.end, end_col >= region.start)
                 else:
-                    pos_cond = and_(
-                        pos_col >= region.start,
-                        pos_col <= region.end,
-                    )
+                    # Dataset only has start position - check if start is within range
+                    pos_cond = and_(pos_col >= region.start, pos_col <= region.end)
             else:
+                # Exact position match
                 pos_cond = pos_col == region.start
 
+            # Combine chromosome and position conditions
             conditions.append(and_(chrom_cond, pos_cond))
 
+    # Apply all genomic conditions with OR logic
     if conditions:
-        query = query.filter(or_(*conditions))
+        if len(conditions) == 1:
+            query = query.filter(conditions[0])
+        else:
+            # Match ANY position/range
+            query = query.filter(or_(*conditions))
 
-    if genomic_filter.pathway:
-        for col in ["pathway", "pathway_name", "kegg_pathway", "reactome_pathway"]:
-            if hasattr(model, col):
-                query = query.filter(
-                    getattr(model, col).ilike(f"%{genomic_filter.pathway}%")
-                )
-                break
+    # Apply pathway filter (independent of positions)
+    if genomic_filter.pathway_names:
+        query = (
+            query.join(Genelist, model_class.gene == Genelist.gene)
+            .join(
+                pathway_gene_association,
+                Genelist.gene == pathway_gene_association.c.gene,
+            )
+            .join(
+                Pathway,
+                pathway_gene_association.c.pathway_id == Pathway.id,
+            )
+            .filter(Pathway.pathway_name.in_(genomic_filter.pathway_names))
+            .distinct()
+        )
+
+    # Apply pathway filter with exact ID matching
+    if genomic_filter.pathway_ids:
+        query = (
+            query.join(Genelist, model_class.gene == Genelist.gene)
+            .join(
+                pathway_gene_association,
+                Genelist.gene == pathway_gene_association.c.gene,
+            )
+            .filter(
+                pathway_gene_association.c.pathway_id.in_(genomic_filter.pathway_ids)
+            )
+            .distinct()
+        )
 
     return query
 
