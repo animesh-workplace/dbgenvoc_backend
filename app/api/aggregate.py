@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from sqlalchemy import func, and_, or_
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field, field_validator
+from app.abstract import Genelist, Pathway, pathway_gene_association
 from app.schema_new import ComplexFilter, HavingClause, HavingCondition
 
 
@@ -47,32 +48,6 @@ class GenomicRegion(BaseModel):
 class GenomicPositionFilter(BaseModel):
     """
     Genomic position filtering - unified approach.
-
-    All genomic locations (ranges and exact positions) are specified in the
-    'positions' field. All conditions are combined with OR logic.
-
-    Features:
-    - Mix ranges and exact positions freely
-    - Multiple chromosomes in one query
-    - Natural OR logic (match ANY position/range)
-    - Optional pathway filtering
-
-    Examples:
-        # Single range
-        {"positions": [{"chromosome": "chr17", "start": 7577000, "end": 7579000}]}
-
-        # Multiple exact positions
-        {"positions": [
-            {"chromosome": "chr17", "start": 7577538},
-            {"chromosome": "chr17", "start": 7578406}
-        ]}
-
-        # Mixed ranges and positions
-        {"positions": [
-            {"chromosome": "chr17", "start": 7571000, "end": 7572000},  # Regulatory region
-            {"chromosome": "chr17", "start": 7577538},                   # R175H hotspot
-            {"chromosome": "chr17", "start": 7578406}                    # R248Q hotspot
-        ]}
     """
 
     positions: Optional[List[GenomicRegion]] = Field(
@@ -84,19 +59,28 @@ class GenomicPositionFilter(BaseModel):
         ),
     )
 
-    pathway: Optional[str] = Field(
+    pathway_ids: Optional[List[str]] = Field(
         None,
         description=(
-            "Filter by pathway name (case-insensitive partial match). "
-            "Examples: 'PI3K-AKT', 'TP53 pathway', 'DNA repair'"
+            "Filter by exact pathway IDs from autocomplete. "
+            "Example: ['hsa04151', 'hsa04115'] for KEGG pathways"
         ),
     )
 
-    @field_validator("positions")
+    pathway_names: Optional[List[str]] = Field(
+        None,
+        description=(
+            "Filter by pathway names (case-insensitive partial match). "
+            "Returns variants in genes associated with ANY of the specified pathways. "
+            "Examples: ['PI3K-AKT signaling', 'TP53 pathway'] or ['DNA repair']"
+        ),
+    )
+
+    @field_validator("pathway_names")
     @classmethod
-    def validate_positions_not_empty(cls, v):
+    def validate_pathway_names_not_empty(cls, v):
         if v is not None and len(v) == 0:
-            raise ValueError("positions list cannot be empty")
+            raise ValueError("pathway_names list cannot be empty")
         return v
 
 
@@ -312,23 +296,35 @@ def _apply_genomic_position_filter(
         else:
             query = query.filter(or_(*conditions))
 
-    # Apply pathway filter
-    if genomic_filter.pathway:
-        pathway_col_name = None
-        for col in ["pathway", "pathway_name", "kegg_pathway", "reactome_pathway"]:
-            if hasattr(model_class, col):
-                pathway_col_name = col
-                break
-
-        if pathway_col_name:
-            pathway_col = getattr(model_class, pathway_col_name)
-            query = query.filter(pathway_col.ilike(f"%{genomic_filter.pathway}%"))
-        else:
-            import warnings
-
-            warnings.warn(
-                f"Pathway filter '{genomic_filter.pathway}' specified but no pathway column found"
+    # Apply pathway filter (independent of positions)
+    if genomic_filter.pathway_names:
+        query = (
+            query.join(Genelist, model_class.gene == Genelist.gene)
+            .join(
+                pathway_gene_association,
+                Genelist.gene == pathway_gene_association.c.gene,
             )
+            .join(
+                Pathway,
+                pathway_gene_association.c.pathway_id == Pathway.id,
+            )
+            .filter(Pathway.pathway_name.in_(genomic_filter.pathway_names))
+            .distinct()
+        )
+
+    # Apply pathway filter with exact ID matching
+    if genomic_filter.pathway_ids:
+        query = (
+            query.join(Genelist, model_class.gene == Genelist.gene)
+            .join(
+                pathway_gene_association,
+                Genelist.gene == pathway_gene_association.c.gene,
+            )
+            .filter(
+                pathway_gene_association.c.pathway_id.in_(genomic_filter.pathway_ids)
+            )
+            .distinct()
+        )
 
     return query
 
