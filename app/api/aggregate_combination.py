@@ -31,25 +31,43 @@ class ComputedFieldType(str, Enum):
     concat = "concat"
 
 
+class GenomicRegion(BaseModel):
+    chromosome: str
+    start: int = Field(..., ge=1)
+    end: Optional[int] = Field(None, ge=1)
+
+    @field_validator("end")
+    @classmethod
+    def validate_end(cls, v, info):
+        if v is not None and v < info.data.get("start"):
+            raise ValueError("end must be >= start")
+        return v
+
+
+class GenomicPositionFilter(BaseModel):
+    """
+    Unified genomic filter:
+    - Multiple positions and/or ranges
+    - OR logic across positions
+    - Optional pathway filter
+    """
+
+    positions: Optional[List[GenomicRegion]] = None
+    pathway: Optional[str] = None
+
+    @field_validator("positions")
+    @classmethod
+    def validate_positions(cls, v):
+        if v is not None and len(v) == 0:
+            raise ValueError("positions cannot be empty")
+        return v
+
+
 class ComputedField(BaseModel):
-    """
-    Derived/computed output field.
-
-    Example:
-    {
-        "name": "mutation",
-        "type": "concat",
-        "columns": ["ref_allele", "tumor_seq_allele2"],
-        "separator": ">"
-    }
-    """
-
-    name: str = Field(..., description="Output field name")
-    type: ComputedFieldType = Field(
-        ComputedFieldType.concat, description="Type of computation"
-    )
-    columns: List[str] = Field(..., min_length=2, description="Source columns")
-    separator: str = Field("", description="Separator for concat")
+    name: str
+    type: ComputedFieldType = ComputedFieldType.concat
+    columns: List[str]
+    separator: str = ""
 
     @field_validator("name")
     @classmethod
@@ -59,65 +77,40 @@ class ComputedField(BaseModel):
         return v
 
 
-# ======================================================
-# REQUEST / RESPONSE SCHEMAS
-# ======================================================
-
-
 class ConcatenatedAggregationRequest(BaseModel):
-    """
-    New combination aggregation request with computed fields.
-    """
-
+    aggregate_column: str
     limit: Optional[int] = None
+    combination_columns: List[str]
     having: Optional[HavingClause] = None
     filters: Optional[ComplexFilter] = None
+    percentage_by: Optional[List[str]] = None
     order_by: Optional[Union[str, List[str]]] = None
     order_direction: OrderDirection = OrderDirection.desc
-    aggregate_column: str = Field(..., description="Column to aggregate on")
-    combination_columns: List[str] = Field(
-        ..., min_length=1, description="Columns to GROUP BY"
-    )
-    aggregation_type: AggregationType = Field(
-        AggregationType.count, description="Aggregation type"
-    )
-    computed_fields: Optional[List[ComputedField]] = Field(
-        None, description="Derived/computed output fields"
-    )
-    percentage_by: Optional[List[str]] = Field(
-        None, description="Subset of combination_columns for percentage denominator"
-    )
+    computed_fields: Optional[List[ComputedField]] = None
+    genomic_filter: Optional[GenomicPositionFilter] = None
+    aggregation_type: AggregationType = AggregationType.count
 
     @field_validator("percentage_by")
     @classmethod
     def validate_percentage_by(cls, v, info):
         if v:
-            combo_cols = info.data.get("combination_columns")
-            if not combo_cols or not set(v).issubset(set(combo_cols)):
-                raise ValueError(
-                    "percentage_by must be a subset of combination_columns"
-                )
-        return v
-
-    @field_validator("limit")
-    @classmethod
-    def validate_limit(cls, v):
-        if v is not None and v < 1:
-            raise ValueError("limit must be > 0")
+            combo = info.data.get("combination_columns")
+            if not combo or not set(v).issubset(combo):
+                raise ValueError("percentage_by must be subset of combination_columns")
         return v
 
 
 class ConcatenatedAggregationResponse(BaseModel):
     table_name: str
     total_records: int
+    limit: Optional[int]
     aggregation_type: str
     aggregate_column: str
     total_combinations: int
-    limit: Optional[int] = None
     results: List[Dict[str, Any]]
     combination_columns: List[str]
-    order_direction: Optional[str] = None
-    order_by: Optional[Union[str, List[str]]] = None
+    order_direction: Optional[str]
+    order_by: Optional[Union[str, List[str]]]
 
 
 # ======================================================
@@ -125,51 +118,74 @@ class ConcatenatedAggregationResponse(BaseModel):
 # ======================================================
 
 
-def validate_computed_fields(
-    computed_fields: Optional[List[ComputedField]],
-    combination_columns: List[str],
-):
-    if not computed_fields:
-        return
-
-    for field in computed_fields:
-        missing = set(field.columns) - set(combination_columns)
-        if missing:
-            raise ValueError(
-                f"Computed field '{field.name}' references columns not in "
-                f"combination_columns: {list(missing)}"
-            )
+def _normalize_chromosome(chrom: str) -> str:
+    chrom = chrom.upper()
+    return chrom[3:] if chrom.startswith("CHR") else chrom
 
 
-def apply_computed_fields(
-    rows: List[Dict[str, Any]],
-    computed_fields: Optional[List[ComputedField]],
-) -> List[Dict[str, Any]]:
-    """
-    Apply computed fields AFTER aggregation.
-    """
-    if not computed_fields:
-        return rows
+def _apply_genomic_position_filter(query, model, genomic_filter):
+    if not genomic_filter:
+        return query
 
-    for row in rows:
-        for field in computed_fields:
-            if field.type == ComputedFieldType.concat:
-                parts = [
-                    "" if row.get(col) is None else str(row.get(col))
-                    for col in field.columns
-                ]
-                row[field.name] = field.separator.join(parts)
+    chr_col = getattr(model, "chrom", None)
+    pos_col = getattr(model, "start", None)
+    end_col = getattr(model, "end", None)
 
-    return rows
+    if not chr_col or not pos_col:
+        raise HTTPException(
+            400,
+            "Dataset must contain 'chrom' and 'start' columns for genomic filtering",
+        )
 
-
-def build_having_filter(having: HavingClause, agg_expr):
     conditions = []
 
-    for cond in having.conditions:
-        if isinstance(cond, HavingCondition):
-            op = cond.operator
-            val = cond.value
+    if genomic_filter.positions:
+        for region in genomic_filter.positions:
+            norm = _normalize_chromosome(region.chromosome)
+
+            chrom_cond = or_(
+                chr_col == norm,
+                chr_col == f"chr{norm}",
+                chr_col == region.chromosome,
+            )
+
+            if region.end:
+                if end_col:
+                    pos_cond = and_(
+                        pos_col <= region.end,
+                        end_col >= region.start,
+                    )
+                else:
+                    pos_cond = and_(
+                        pos_col >= region.start,
+                        pos_col <= region.end,
+                    )
+            else:
+                pos_cond = pos_col == region.start
+
+            conditions.append(and_(chrom_cond, pos_cond))
+
+    if conditions:
+        query = query.filter(or_(*conditions))
+
+    if genomic_filter.pathway:
+        for col in ["pathway", "pathway_name", "kegg_pathway", "reactome_pathway"]:
+            if hasattr(model, col):
+                query = query.filter(
+                    getattr(model, col).ilike(f"%{genomic_filter.pathway}%")
+                )
+                break
+
+    return query
+
+
+def _build_having_filter(having: HavingClause, agg_expr):
+    conditions = []
+
+    for c in having.conditions:
+        if isinstance(c, HavingCondition):
+            op = c.operator
+            val = c.value
             if op == "eq":
                 conditions.append(agg_expr == val)
             elif op == "neq":
@@ -183,13 +199,26 @@ def build_having_filter(having: HavingClause, agg_expr):
             elif op == "lte":
                 conditions.append(agg_expr <= val)
         else:
-            conditions.append(build_having_filter(cond, agg_expr))
+            conditions.append(_build_having_filter(c, agg_expr))
 
     return and_(*conditions) if having.logic == "AND" else or_(*conditions)
 
 
+def _apply_computed_fields(rows, computed_fields):
+    if not computed_fields:
+        return rows
+
+    for row in rows:
+        for field in computed_fields:
+            if field.type == ComputedFieldType.concat:
+                row[field.name] = field.separator.join(
+                    "" if row.get(c) is None else str(row.get(c)) for c in field.columns
+                )
+    return rows
+
+
 # ======================================================
-# MAIN AGGREGATION FUNCTION
+# MAIN API
 # ======================================================
 
 
@@ -198,122 +227,76 @@ async def generic_concatenated_aggregate(
     db,
     table_name: str,
 ) -> ConcatenatedAggregationResponse:
-    """
-    Combination aggregation with derived/computed output fields.
-    """
-
     try:
-        model_class = get_model_class(table_name)
+        model = get_model_class(table_name)
 
-        # --- Validation ---
-        validate_columns(model_class, request.combination_columns)
-        validate_columns(model_class, [request.aggregate_column])
-        if request.percentage_by:
-            validate_columns(model_class, request.percentage_by)
+        validate_columns(model, request.combination_columns)
+        validate_columns(model, [request.aggregate_column])
 
-        validate_computed_fields(
-            request.computed_fields,
-            request.combination_columns,
-        )
+        agg_col = getattr(model, request.aggregate_column)
+        group_attrs = [getattr(model, c) for c in request.combination_columns]
 
-        agg_col = getattr(model_class, request.aggregate_column)
-        group_attrs = [getattr(model_class, c) for c in request.combination_columns]
-
-        # --- Base Query ---
-        query = db.query(model_class)
-        query = apply_filters(query, model_class, request.filters)
+        query = db.query(model)
+        query = apply_filters(query, model, request.filters)
+        query = _apply_genomic_position_filter(query, model, request.genomic_filter)
 
         total_records = query.count()
 
-        # --- Aggregation Expression ---
+        # Aggregation expression
         if request.aggregation_type == AggregationType.count:
             agg_expr = func.count(agg_col)
-        elif request.aggregation_type == AggregationType.sum:
-            agg_expr = func.sum(agg_col)
-        elif request.aggregation_type == AggregationType.avg:
-            agg_expr = func.avg(agg_col)
-        elif request.aggregation_type == AggregationType.min:
-            agg_expr = func.min(agg_col)
-        elif request.aggregation_type == AggregationType.max:
-            agg_expr = func.max(agg_col)
         elif request.aggregation_type == AggregationType.distinct_count:
             agg_expr = func.count(func.distinct(agg_col))
         elif request.aggregation_type == AggregationType.percentage:
-            if request.percentage_by:
-                partition_cols = [
-                    getattr(model_class, c) for c in request.percentage_by
-                ]
-                denom = func.sum(func.count(agg_col)).over(partition_by=partition_cols)
-                agg_expr = (func.count(agg_col) * 100.0) / denom
-            else:
-                agg_expr = (func.count(agg_col) * 100.0) / (
-                    total_records if total_records else 1
-                )
+            agg_expr = (func.count(agg_col) * 100.0) / (
+                total_records if total_records else 1
+            )
         else:
-            raise ValueError("Unsupported aggregation type")
+            raise HTTPException(400, "Unsupported aggregation type")
 
-        # --- Grouped Query ---
         grouped_query = query.with_entities(
-            *group_attrs, agg_expr.label("aggregated_value")
+            *group_attrs,
+            agg_expr.label("aggregated_value"),
         ).group_by(*group_attrs)
 
         total_combinations = (
             db.query(func.count()).select_from(grouped_query.subquery()).scalar() or 0
         )
 
-        # --- HAVING ---
         if request.having:
             grouped_query = grouped_query.having(
-                build_having_filter(request.having, agg_expr)
+                _build_having_filter(request.having, agg_expr)
             )
 
-        # --- ORDER BY ---
         if request.order_by:
 
-            def order(expr):
+            def order(x):
                 return (
-                    expr.desc()
+                    x.desc()
                     if request.order_direction == OrderDirection.desc
-                    else expr.asc()
+                    else x.asc()
                 )
 
-            if isinstance(request.order_by, str):
-                if request.order_by == "aggregated_value":
-                    grouped_query = grouped_query.order_by(order(agg_expr))
-                else:
-                    idx = request.combination_columns.index(request.order_by)
-                    grouped_query = grouped_query.order_by(order(group_attrs[idx]))
+            if request.order_by == "aggregated_value":
+                grouped_query = grouped_query.order_by(order(agg_expr))
             else:
-                for col in request.order_by:
-                    if col == "aggregated_value":
-                        grouped_query = grouped_query.order_by(order(agg_expr))
-                    else:
-                        idx = request.combination_columns.index(col)
-                        grouped_query = grouped_query.order_by(order(group_attrs[idx]))
+                idx = request.combination_columns.index(request.order_by)
+                grouped_query = grouped_query.order_by(order(group_attrs[idx]))
 
-        # --- LIMIT ---
         if request.limit:
             grouped_query = grouped_query.limit(request.limit)
 
-        # --- Execute ---
         rows = grouped_query.all()
 
-        # --- Format Results ---
-        results: List[Dict[str, Any]] = []
-
+        results = []
         for row in rows:
-            item: Dict[str, Any] = {}
+            item = {}
             for i, col in enumerate(request.combination_columns):
                 item[col] = row[i]
-
-            val = row[len(request.combination_columns)]
-            if request.aggregation_type == AggregationType.percentage:
-                val = round(float(val), 2)
-
-            item["aggregated_value"] = val
+            item["aggregated_value"] = row[-1]
             results.append(item)
 
-        results = apply_computed_fields(results, request.computed_fields)
+        results = _apply_computed_fields(results, request.computed_fields)
 
         return ConcatenatedAggregationResponse(
             results=results,
@@ -330,10 +313,5 @@ async def generic_concatenated_aggregate(
 
     except HTTPException:
         raise
-    except ValueError as ve:
-        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Combination aggregation failed: {str(e)}",
-        )
+        raise HTTPException(500, f"Combination aggregation failed: {str(e)}")
