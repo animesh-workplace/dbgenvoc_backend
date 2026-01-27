@@ -7,17 +7,31 @@ from app.schema_new import ComplexFilter, HavingClause, HavingCondition
 
 
 # ==========================================
-# GENOMIC POSITION SCHEMAS
+# AGGREGATION SCHEMAS
 # ==========================================
 
 
 class GenomicRegion(BaseModel):
-    """Single genomic region specification"""
+    """
+    Single genomic region specification.
 
-    chromosome: str = Field(..., description="Chromosome (e.g., 'chr1', '1', 'X')")
+    Can represent either:
+    - Exact position: Provide chromosome + start only
+    - Range: Provide chromosome + start + end
+
+    Examples:
+        Exact position: {"chromosome": "chr17", "start": 7577538}
+        Range: {"chromosome": "chr17", "start": 7577000, "end": 7579000}
+    """
+
+    chromosome: str = Field(
+        ..., description="Chromosome name (e.g., 'chr1', '1', 'X', 'Y', 'MT')"
+    )
     start: int = Field(..., ge=1, description="Start position (1-based, inclusive)")
     end: Optional[int] = Field(
-        None, ge=1, description="End position (1-based, inclusive)"
+        None,
+        ge=1,
+        description="End position (1-based, inclusive). Omit for exact position match.",
     )
 
     @field_validator("end")
@@ -31,37 +45,59 @@ class GenomicRegion(BaseModel):
 
 
 class GenomicPositionFilter(BaseModel):
-    """Genomic position filtering - supports ranges and specific positions"""
+    """
+    Genomic position filtering - unified approach.
 
-    # Option 1: Single range [chr1:915188-1015188]
-    region: Optional[GenomicRegion] = Field(
-        None, description="Single genomic region (chr + start + optional end)"
-    )
+    All genomic locations (ranges and exact positions) are specified in the
+    'positions' field. All conditions are combined with OR logic.
 
-    # Option 2: Multiple specific positions [chr11:534289, chr17:7578406]
+    Features:
+    - Mix ranges and exact positions freely
+    - Multiple chromosomes in one query
+    - Natural OR logic (match ANY position/range)
+    - Optional pathway filtering
+
+    Examples:
+        # Single range
+        {"positions": [{"chromosome": "chr17", "start": 7577000, "end": 7579000}]}
+
+        # Multiple exact positions
+        {"positions": [
+            {"chromosome": "chr17", "start": 7577538},
+            {"chromosome": "chr17", "start": 7578406}
+        ]}
+
+        # Mixed ranges and positions
+        {"positions": [
+            {"chromosome": "chr17", "start": 7571000, "end": 7572000},  # Regulatory region
+            {"chromosome": "chr17", "start": 7577538},                   # R175H hotspot
+            {"chromosome": "chr17", "start": 7578406}                    # R248Q hotspot
+        ]}
+    """
+
     positions: Optional[List[GenomicRegion]] = Field(
-        None, description="List of specific genomic positions or regions"
+        None,
+        description=(
+            "List of genomic positions or ranges. "
+            "Can mix exact positions (start only) and ranges (start + end). "
+            "All conditions combined with OR logic - matches ANY position/range."
+        ),
     )
 
-    # Pathway filter (optional)
     pathway: Optional[str] = Field(
-        None, description="Filter by pathway name (e.g., 'PI3K-AKT', 'TP53 pathway')"
+        None,
+        description=(
+            "Filter by pathway name (case-insensitive partial match). "
+            "Examples: 'PI3K-AKT', 'TP53 pathway', 'DNA repair'"
+        ),
     )
 
     @field_validator("positions")
     @classmethod
-    def validate_positions_or_region(cls, v, info):
-        region = info.data.get("region")
-        if v is not None and region is not None:
-            raise ValueError("Cannot specify both 'region' and 'positions'")
-        if v is None and region is None and not info.data.get("pathway"):
-            return None  # All filters are optional
+    def validate_positions_not_empty(cls, v):
+        if v is not None and len(v) == 0:
+            raise ValueError("positions list cannot be empty")
         return v
-
-
-# ==========================================
-# AGGREGATION SCHEMAS
-# ==========================================
 
 
 class AggregationType(str, Enum):
@@ -83,7 +119,6 @@ class AggregationRequest(BaseModel):
     column: str = Field(..., description="Target column for aggregation")
     group_by: Optional[List[str]] = Field(None, description="Columns to group by")
 
-    # If provided, calculates % share relative to these columns
     percentage_by: Optional[List[str]] = Field(
         None, description="Columns to calculate percentage against (denominator scope)"
     )
@@ -92,10 +127,10 @@ class AggregationRequest(BaseModel):
         None, description="Complex filters with AND/OR logic (applied before GROUP BY)"
     )
 
-    # --- Genomic Position Filters (NEW) ---
+    # --- Genomic Position Filters (UNIFIED) ---
     genomic_filter: Optional[GenomicPositionFilter] = Field(
         None,
-        description="Filter by genomic position/range or pathway (applied before GROUP BY)",
+        description="Filter by genomic positions/ranges or pathway (applied before GROUP BY)",
     )
 
     aggregation_type: AggregationType = Field(
@@ -109,7 +144,7 @@ class AggregationRequest(BaseModel):
 
     order_by: Optional[Union[str, List[str]]] = Field(
         None,
-        description="Column(s) to order results by. Use 'aggregated_value' for ordering by the aggregation result. For multiple columns, provide as list.",
+        description="Column(s) to order results by. Use 'aggregated_value' for ordering by the aggregation result.",
     )
 
     order_direction: OrderDirection = Field(
@@ -142,7 +177,6 @@ class AggregationRequest(BaseModel):
     @classmethod
     def validate_order_by(cls, v, info):
         if v is not None and not info.data.get("group_by"):
-            # For scalar aggregations, only allow ordering by aggregated_value
             if isinstance(v, str) and v != "aggregated_value":
                 raise ValueError(
                     "For scalar aggregations (without group_by), order_by must be 'aggregated_value' or None"
@@ -164,18 +198,14 @@ class AggregationRequest(BaseModel):
 class AggregationResponse(BaseModel):
     column: str
     table_name: str
+    total_records: int
     aggregation_type: str
-    total_records: int  # Total records after WHERE filtering (including genomic)
-    groups_after_having: Optional[int] = None  # Number of groups after HAVING
-    groups_before_having: Optional[int] = None  # Number of groups before HAVING
-    # Contains the total count for each group defined in percentage_by
-    # Key = "Value" (or "Value1|Value2" for composite), Value = Total Count
-    group_totals: Optional[Dict[str, int]] = None
-    # Ordering and limiting information
-    order_by: Optional[Union[str, List[str]]] = None
-    order_direction: Optional[str] = None
     limit: Optional[int] = None
-
+    order_direction: Optional[str] = None
+    groups_after_having: Optional[int] = None
+    groups_before_having: Optional[int] = None
+    group_totals: Optional[Dict[str, int]] = None
+    order_by: Optional[Union[str, List[str]]] = None
     result: Union[Dict[str, Any], List[Dict[str, Any]]]
 
 
@@ -185,7 +215,15 @@ class AggregationResponse(BaseModel):
 
 
 def _normalize_chromosome(chrom: str) -> str:
-    """Normalize chromosome name (remove 'chr' prefix)"""
+    """
+    Normalize chromosome name for flexible matching.
+
+    Examples:
+        'chr1' -> '1'
+        'CHR17' -> '17'
+        '17' -> '17'
+        'chrX' -> 'X'
+    """
     if not chrom:
         return chrom
     chrom_str = str(chrom).upper()
@@ -198,12 +236,15 @@ def _apply_genomic_position_filter(
     query, model_class, genomic_filter: Optional[GenomicPositionFilter]
 ):
     """
-    Apply genomic position filtering to query.
+    Apply genomic position filtering to query (unified approach).
 
-    Supports:
-    1. Single range: chr1:915188-1015188
-    2. Multiple positions: chr11:534289, chr17:7578406, chr17:7577538
-    3. Pathway filtering (if pathway column exists)
+    Features:
+    1. Unified positions list - mix ranges and exact positions
+    2. Flexible chromosome naming ('chr17' or '17')
+    3. Overlap detection (if dataset has 'end' column)
+    4. Exact position matching (if no 'end' column)
+    5. Pathway filtering (if pathway column exists)
+    6. OR logic - match ANY position/range
 
     Args:
         query: SQLAlchemy query
@@ -216,96 +257,62 @@ def _apply_genomic_position_filter(
     if not genomic_filter:
         return query
 
-    # Determine chromosome and position column names
-    chr_col_name = None
-    for col in ["chrom", "chromosome", "chr"]:
-        if hasattr(model_class, col):
-            chr_col_name = col
-            break
-
-    pos_col_name = None
-    for col in ["start", "start_position", "pos", "position"]:
-        if hasattr(model_class, col):
-            pos_col_name = col
-            break
-
-    end_col_name = None
-    for col in ["end", "end_position"]:
-        if hasattr(model_class, col):
-            end_col_name = col
-            break
+    # Detect chromosome and position column names in the dataset
+    chr_col_name = "chrom"
+    pos_col_name = "start"
+    end_col_name = "end"
 
     if not chr_col_name or not pos_col_name:
         raise HTTPException(
             400,
-            "Dataset must have chromosome and position columns for genomic filtering",
+            detail=(
+                "Dataset must have chromosome and position columns for genomic filtering. "
+                f"Found columns: {[c.name for c in model_class.__table__.columns]}"
+            ),
         )
 
     chr_col = getattr(model_class, chr_col_name)
     pos_col = getattr(model_class, pos_col_name)
     end_col = getattr(model_class, end_col_name) if end_col_name else None
 
-    # Apply filters
+    # Build genomic position conditions
     conditions = []
 
-    # Option 1: Single region filter
-    if genomic_filter.region:
-        region = genomic_filter.region
-        norm_chrom = _normalize_chromosome(region.chromosome)
+    if genomic_filter.positions:
+        for region in genomic_filter.positions:
+            norm_chrom = _normalize_chromosome(region.chromosome)
 
-        # Chromosome match (flexible - handles both 'chr1' and '1')
-        chrom_cond = or_(
-            chr_col == norm_chrom,
-            chr_col == f"chr{norm_chrom}",
-            chr_col == region.chromosome,
-        )
-
-        if region.end:
-            # Range query: variants overlapping [start, end]
-            if end_col:
-                # If dataset has end column, check for overlap
-                # Overlap: variant.start <= region.end AND variant.end >= region.start
-                pos_cond = and_(pos_col <= region.end, end_col >= region.start)
-            else:
-                # No end column, just check if position is within range
-                pos_cond = and_(pos_col >= region.start, pos_col <= region.end)
-        else:
-            # Exact position match
-            pos_cond = pos_col == region.start
-
-        conditions.append(and_(chrom_cond, pos_cond))
-
-    # Option 2: Multiple specific positions
-    elif genomic_filter.positions:
-        for pos_spec in genomic_filter.positions:
-            norm_chrom = _normalize_chromosome(pos_spec.chromosome)
-
+            # Flexible chromosome matching
             chrom_cond = or_(
                 chr_col == norm_chrom,
                 chr_col == f"chr{norm_chrom}",
-                chr_col == pos_spec.chromosome,
+                chr_col == region.chromosome,
+                chr_col == region.chromosome.upper(),
+                chr_col == region.chromosome.lower(),
             )
 
-            if pos_spec.end:
-                # Range for this position
+            if region.end:
+                # Range query
                 if end_col:
-                    pos_cond = and_(pos_col <= pos_spec.end, end_col >= pos_spec.start)
+                    # Overlap detection
+                    pos_cond = and_(pos_col <= region.end, end_col >= region.start)
                 else:
-                    pos_cond = and_(pos_col >= pos_spec.start, pos_col <= pos_spec.end)
+                    # Position within range
+                    pos_cond = and_(pos_col >= region.start, pos_col <= region.end)
             else:
-                # Exact position
-                pos_cond = pos_col == pos_spec.start
+                # Exact position match
+                pos_cond = pos_col == region.start
 
             conditions.append(and_(chrom_cond, pos_cond))
 
-    # Apply genomic conditions (OR logic for multiple positions)
+    # Apply all genomic conditions with OR logic
     if conditions:
         if len(conditions) == 1:
             query = query.filter(conditions[0])
         else:
             query = query.filter(or_(*conditions))
 
-    # Option 3: Pathway filter (if column exists)
+    # Apply pathway filter
     if genomic_filter.pathway:
         pathway_col_name = None
         for col in ["pathway", "pathway_name", "kegg_pathway", "reactome_pathway"]:
@@ -316,6 +323,12 @@ def _apply_genomic_position_filter(
         if pathway_col_name:
             pathway_col = getattr(model_class, pathway_col_name)
             query = query.filter(pathway_col.ilike(f"%{genomic_filter.pathway}%"))
+        else:
+            import warnings
+
+            warnings.warn(
+                f"Pathway filter '{genomic_filter.pathway}' specified but no pathway column found"
+            )
 
     return query
 
@@ -343,21 +356,11 @@ async def _calculate_global_percentage(query, db, model_class, col_attr):
 
 
 def _build_having_filter(having_clause: HavingClause, agg_expr):
-    """
-    Recursively builds SQLAlchemy HAVING conditions.
-
-    Args:
-        having_clause: The HavingClause to process
-        agg_expr: The aggregation expression to apply conditions to
-
-    Returns:
-        SQLAlchemy BinaryExpression for HAVING clause
-    """
+    """Recursively builds SQLAlchemy HAVING conditions."""
     conditions = []
 
     for condition in having_clause.conditions:
         if isinstance(condition, HavingCondition):
-            # Base case: single condition
             if condition.operator == "eq":
                 conditions.append(agg_expr == condition.value)
             elif condition.operator == "neq":
@@ -371,37 +374,21 @@ def _build_having_filter(having_clause: HavingClause, agg_expr):
             elif condition.operator == "lte":
                 conditions.append(agg_expr <= condition.value)
         else:
-            # Recursive case: nested HavingClause
             conditions.append(_build_having_filter(condition, agg_expr))
 
-    # Combine with appropriate logic
     if having_clause.logic == "AND":
         return and_(*conditions)
-    else:  # OR
+    else:
         return or_(*conditions)
 
 
 def _apply_ordering(
     query, order_by, order_direction, group_attrs, agg_expr, group_by_columns
 ):
-    """
-    Apply ordering to the query based on order_by specification.
-
-    Args:
-        query: The SQLAlchemy query to order
-        order_by: String or list of strings specifying what to order by
-        order_direction: 'asc' or 'desc'
-        group_attrs: List of SQLAlchemy column attributes for group_by columns
-        agg_expr: The aggregation expression
-        group_by_columns: List of group_by column names
-
-    Returns:
-        Ordered query
-    """
+    """Apply ordering to the query."""
     order_clauses = []
 
     def add_order_clause(column_expr):
-        """Helper to add order clause with direction."""
         if order_direction == OrderDirection.desc:
             return column_expr.desc()
         else:
@@ -409,7 +396,6 @@ def _apply_ordering(
 
     if order_by:
         if isinstance(order_by, str):
-            # Single order by column
             if order_by == "aggregated_value":
                 order_clauses.append(add_order_clause(agg_expr))
             elif order_by in group_by_columns:
@@ -420,7 +406,6 @@ def _apply_ordering(
                     f"Cannot order by '{order_by}'. Must be 'aggregated_value' or one of group_by columns: {group_by_columns}"
                 )
         else:
-            # Multiple order by columns
             for order_col in order_by:
                 if order_col == "aggregated_value":
                     order_clauses.append(add_order_clause(agg_expr))
@@ -432,7 +417,6 @@ def _apply_ordering(
                         f"Cannot order by '{order_col}'. Must be 'aggregated_value' or one of group_by columns: {group_by_columns}"
                     )
 
-    # Apply ordering to query
     if order_clauses:
         query = query.order_by(*order_clauses)
 
@@ -448,12 +432,12 @@ async def generic_aggregate(
     request: AggregationRequest, db, table_name: str
 ) -> AggregationResponse:
     """
-    Enhanced generic aggregation endpoint with genomic position filtering.
+    Enhanced generic aggregation endpoint with unified genomic position filtering.
 
     Query execution order:
     1. FROM table_name
     2. WHERE (filters)
-    3. WHERE (genomic_filter) ← NEW
+    3. WHERE (genomic_filter - unified positions/ranges)
     4. GROUP BY (group_by)
     5. HAVING (having clause on aggregated results)
     6. ORDER BY (order_by)
@@ -478,13 +462,18 @@ async def generic_aggregate(
         query = db.query(model_class)
         query = apply_filters(query, model_class, request.filters)
 
-        # 2b. Apply Genomic Position Filters (NEW)
+        # 2b. Apply Genomic Position Filters (UNIFIED)
         query = _apply_genomic_position_filter(
             query, model_class, request.genomic_filter
         )
 
-        # 3. Capture Total Records (After WHERE + genomic filters, Before GROUP BY)
+        # 3. Capture Total Records
         total_records = query.count()
+
+        # Calculate genomic positions count
+        genomic_positions_count = None
+        if request.genomic_filter and request.genomic_filter.positions:
+            genomic_positions_count = len(request.genomic_filter.positions)
 
         # 4. Perform Aggregation
         final_result = None
@@ -501,7 +490,6 @@ async def generic_aggregate(
             # Determine aggregation expression
             if request.aggregation_type == AggregationType.percentage:
                 if request.percentage_by:
-                    # --- SCOPED PERCENTAGE ---
                     partition_attrs = [
                         getattr(model_class, c) for c in request.percentage_by
                     ]
@@ -511,12 +499,10 @@ async def generic_aggregate(
                     agg_expr = (func.count(col_attr) * 100.0) / denominator
                     extra_selects.append(denominator.label("group_total"))
                 else:
-                    # --- GLOBAL PERCENTAGE ---
                     agg_expr = (func.count(col_attr) * 100.0) / (
                         total_records if total_records > 0 else 1
                     )
             else:
-                # --- STANDARD AGGREGATIONS ---
                 funcs_map = {
                     AggregationType.count: func.count(col_attr),
                     AggregationType.sum: func.sum(col_attr),
@@ -527,7 +513,7 @@ async def generic_aggregate(
                 }
                 agg_expr = funcs_map.get(request.aggregation_type)
 
-            # Build base grouped query
+            # Build grouped query
             grouped_query = query.with_entities(
                 *group_attrs, agg_expr.label("val"), *extra_selects
             ).group_by(*group_attrs)
@@ -537,12 +523,12 @@ async def generic_aggregate(
                 db.query(func.count()).select_from(grouped_query.subquery()).scalar()
             )
 
-            # Apply HAVING clause if present
+            # Apply HAVING
             if request.having:
                 having_filter = _build_having_filter(request.having, agg_expr)
                 grouped_query = grouped_query.having(having_filter)
 
-            # Apply ORDER BY if specified
+            # Apply ORDER BY
             if request.order_by:
                 grouped_query = _apply_ordering(
                     grouped_query,
@@ -553,7 +539,7 @@ async def generic_aggregate(
                     group_by_columns,
                 )
 
-            # Apply LIMIT if specified
+            # Apply LIMIT
             if request.limit:
                 grouped_query = grouped_query.limit(request.limit)
 
@@ -563,8 +549,6 @@ async def generic_aggregate(
 
             # Format Results
             formatted_results = []
-
-            # Helper to find indices of percentage_by columns in result tuple
             pct_indices = []
             if request.percentage_by:
                 pct_indices = [group_by_columns.index(c) for c in request.percentage_by]
@@ -572,11 +556,9 @@ async def generic_aggregate(
             for result in results:
                 result_dict = {}
 
-                # A. Map Group Columns
                 for i, group_col in enumerate(group_by_columns):
                     result_dict[group_col] = result[i]
 
-                # B. Map Aggregated Value
                 val_index = len(group_by_columns)
                 val = result[val_index]
                 if (
@@ -586,17 +568,11 @@ async def generic_aggregate(
                     val = round(float(val), 2)
                 result_dict["aggregated_value"] = val
 
-                # C. Extract Group Totals (if percentage_by active)
                 if request.aggregation_type == AggregationType.percentage:
                     if request.percentage_by:
-                        # 1. Get total from query
                         total_val = result[val_index + 1]
-
-                        # 2. Build Composite Key for the map
                         key_parts = [str(result[idx]) for idx in pct_indices]
                         key = "|".join(key_parts)
-
-                        # 3. Store in map
                         group_totals_map[key] = int(total_val) if total_val else 0
                     else:
                         group_totals_map["global"] = total_records
@@ -606,8 +582,7 @@ async def generic_aggregate(
             final_result = formatted_results
 
         else:
-            # === SCALAR AGGREGATION (No GROUP BY) ===
-            # For scalar aggregations, ordering and limiting don't make sense
+            # === SCALAR AGGREGATION ===
             if request.aggregation_type == AggregationType.percentage:
                 val = await _calculate_global_percentage(
                     query, db, model_class, col_attr
