@@ -28,6 +28,7 @@ from app.api.proximity_variant_finder import (
 )
 from app.api.aggregate_combination import (
     ConcatenatedAggregationRequest,
+    ConcatenatedAggregationResponse,
     generic_concatenated_aggregate,
 )
 from app.api.autocomplete import (
@@ -78,7 +79,8 @@ async def TABLE_AGGREGATE_API(
 
 
 @api_router.post(
-    "/{table_name}/aggregate-concatenated", response_model=AggregationResponse
+    "/{table_name}/aggregate-concatenated",
+    response_model=ConcatenatedAggregationResponse,
 )
 async def TABLE_AGGREGATE_CONCATE_API(
     request: ConcatenatedAggregationRequest,
