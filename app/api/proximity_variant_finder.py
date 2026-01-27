@@ -433,28 +433,11 @@ async def proximity_variant_finder(
     try:
         model_class = get_model_class(table_name)
 
-        # Validate required columns
-        pos_col_name = None
-        for col_name in ["start", "start_position", "pos"]:
-            if hasattr(model_class, col_name):
-                pos_col_name = col_name
-                break
-        if not pos_col_name:
-            raise HTTPException(400, "Dataset must have position column")
-
-        chr_col_name = None
-        for col_name in ["chrom", "chromosome", "chr"]:
-            if hasattr(model_class, col_name):
-                chr_col_name = col_name
-                break
-        if not chr_col_name:
-            raise HTTPException(400, "Dataset must have chromosome column")
-
-        pos_col = getattr(model_class, pos_col_name)
-        chr_col = getattr(model_class, chr_col_name)
+        pos_col = getattr(model_class, "start")
+        chr_col = getattr(model_class, "chrom")
 
         # Gene column (optional)
-        gene_col_name = None
+        gene_col_name = "gene"
         for col_name in ["hugo_symbol", "gene", "gene_symbol"]:
             if hasattr(model_class, col_name):
                 gene_col_name = col_name
@@ -530,10 +513,10 @@ async def proximity_variant_finder(
         aggregated_data = {}
 
         for ref_variant in reference_variants:
-            ref_chrom = getattr(ref_variant, chr_col_name)
+            ref_chrom = getattr(ref_variant, "chrom")
 
             # Get position
-            ref_pos_raw = getattr(ref_variant, pos_col_name)
+            ref_pos_raw = getattr(ref_variant, "start")
             try:
                 ref_pos = int(ref_pos_raw)
             except (ValueError, TypeError):
@@ -682,7 +665,7 @@ async def proximity_variant_finder(
             # Calculate distances and create variant objects
             ref_nearby_variants = []
             for query_variant in query_variants:
-                query_pos_raw = getattr(query_variant, pos_col_name)
+                query_pos_raw = getattr(query_variant, "start")
                 try:
                     query_pos = int(query_pos_raw)
                 except (ValueError, TypeError):
@@ -791,7 +774,7 @@ async def proximity_variant_finder(
         if not request.aggregate_by_reference:
             unique_variants = {}
             for variant in nearby_variants:
-                key = f"{variant.get(chr_col_name)}:{variant.get(pos_col_name)}"
+                key = f"{variant.get('chrom')}:{variant.get('start')}"
                 if (
                     key not in unique_variants
                     or variant["distance_bp"] < unique_variants[key]["distance_bp"]
