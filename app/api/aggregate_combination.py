@@ -13,7 +13,60 @@ from app.core import (
 
 
 # ==========================================
-#               SCHEMAS
+# GENOMIC POSITION SCHEMAS
+# ==========================================
+
+
+class GenomicRegion(BaseModel):
+    """Single genomic region specification"""
+
+    chromosome: str = Field(..., description="Chromosome (e.g., 'chr1', '1', 'X')")
+    start: int = Field(..., ge=1, description="Start position (1-based, inclusive)")
+    end: Optional[int] = Field(
+        None, ge=1, description="End position (1-based, inclusive)"
+    )
+
+    @field_validator("end")
+    @classmethod
+    def validate_end_after_start(cls, v, info):
+        if v is not None:
+            start = info.data.get("start")
+            if start and v < start:
+                raise ValueError("end must be >= start")
+        return v
+
+
+class GenomicPositionFilter(BaseModel):
+    """Genomic position filtering - supports ranges and specific positions"""
+
+    # Option 1: Single range [chr1:915188-1015188]
+    region: Optional[GenomicRegion] = Field(
+        None, description="Single genomic region (chr + start + optional end)"
+    )
+
+    # Option 2: Multiple specific positions [chr11:534289, chr17:7578406]
+    positions: Optional[List[GenomicRegion]] = Field(
+        None, description="List of specific genomic positions or regions"
+    )
+
+    # Pathway filter (optional)
+    pathway: Optional[str] = Field(
+        None, description="Filter by pathway name (e.g., 'PI3K-AKT', 'TP53 pathway')"
+    )
+
+    @field_validator("positions")
+    @classmethod
+    def validate_positions_or_region(cls, v, info):
+        region = info.data.get("region")
+        if v is not None and region is not None:
+            raise ValueError("Cannot specify both 'region' and 'positions'")
+        if v is None and region is None and not info.data.get("pathway"):
+            return None  # All filters are optional
+        return v
+
+
+# ==========================================
+# CONCATENATED AGGREGATION SCHEMAS
 # ==========================================
 
 
@@ -43,6 +96,12 @@ class ConcatenatedAggregationRequest(BaseModel):
     filters: Optional[ComplexFilter] = Field(
         None,
         description="Filters to apply before concatenation (applied before GROUP BY)",
+    )
+
+    # --- Genomic Position Filters (NEW) ---
+    genomic_filter: Optional[GenomicPositionFilter] = Field(
+        None,
+        description="Filter by genomic position/range or pathway (applied before GROUP BY)",
     )
 
     aggregation_type: AggregationType = Field(
@@ -132,24 +191,154 @@ class AggregationResponse(BaseModel):
     table_name: str
     total_records: int
     aggregation_type: str
-    having_applied: bool = False  # Whether HAVING clause was used
-    groups_after_having: Optional[int] = None  # Number of groups after HAVING
-    groups_before_having: Optional[int] = None  # Number of groups before HAVING
-
-    # New Key: Group Totals
-    group_totals: Optional[Dict[str, int]] = None
-
-    # Ordering and limiting information
-    order_by: Optional[Union[str, List[str]]] = None
-    order_direction: Optional[str] = None
     limit: Optional[int] = None
-
+    order_direction: Optional[str] = None
+    groups_after_having: Optional[int] = None
+    groups_before_having: Optional[int] = None
+    group_totals: Optional[Dict[str, int]] = None
+    order_by: Optional[Union[str, List[str]]] = None
     result: Union[Dict[str, Any], List[Dict[str, Any]]]
 
 
 # ==========================================
-#           INTERNAL HELPERS
+# INTERNAL HELPERS
 # ==========================================
+
+
+def _normalize_chromosome(chrom: str) -> str:
+    """Normalize chromosome name (remove 'chr' prefix)"""
+    if not chrom:
+        return chrom
+    chrom_str = str(chrom).upper()
+    if chrom_str.startswith("CHR"):
+        return chrom_str[3:]
+    return chrom_str
+
+
+def _apply_genomic_position_filter(
+    query, model_class, genomic_filter: Optional[GenomicPositionFilter]
+):
+    """
+    Apply genomic position filtering to query.
+
+    Supports:
+    1. Single range: chr1:915188-1015188
+    2. Multiple positions: chr11:534289, chr17:7578406, chr17:7577538
+    3. Pathway filtering (if pathway column exists)
+
+    Args:
+        query: SQLAlchemy query
+        model_class: Model class
+        genomic_filter: GenomicPositionFilter object
+
+    Returns:
+        Filtered query
+    """
+    if not genomic_filter:
+        return query
+
+    # Determine chromosome and position column names
+    chr_col_name = None
+    for col in ["chrom", "chromosome", "chr"]:
+        if hasattr(model_class, col):
+            chr_col_name = col
+            break
+
+    pos_col_name = None
+    for col in ["start", "start_position", "pos", "position"]:
+        if hasattr(model_class, col):
+            pos_col_name = col
+            break
+
+    end_col_name = None
+    for col in ["end", "end_position"]:
+        if hasattr(model_class, col):
+            end_col_name = col
+            break
+
+    if not chr_col_name or not pos_col_name:
+        raise HTTPException(
+            400,
+            "Dataset must have chromosome and position columns for genomic filtering",
+        )
+
+    chr_col = getattr(model_class, chr_col_name)
+    pos_col = getattr(model_class, pos_col_name)
+    end_col = getattr(model_class, end_col_name) if end_col_name else None
+
+    # Apply filters
+    conditions = []
+
+    # Option 1: Single region filter
+    if genomic_filter.region:
+        region = genomic_filter.region
+        norm_chrom = _normalize_chromosome(region.chromosome)
+
+        # Chromosome match (flexible - handles both 'chr1' and '1')
+        chrom_cond = or_(
+            chr_col == norm_chrom,
+            chr_col == f"chr{norm_chrom}",
+            chr_col == region.chromosome,
+        )
+
+        if region.end:
+            # Range query: variants overlapping [start, end]
+            if end_col:
+                # If dataset has end column, check for overlap
+                # Overlap: variant.start <= region.end AND variant.end >= region.start
+                pos_cond = and_(pos_col <= region.end, end_col >= region.start)
+            else:
+                # No end column, just check if position is within range
+                pos_cond = and_(pos_col >= region.start, pos_col <= region.end)
+        else:
+            # Exact position match
+            pos_cond = pos_col == region.start
+
+        conditions.append(and_(chrom_cond, pos_cond))
+
+    # Option 2: Multiple specific positions
+    elif genomic_filter.positions:
+        for pos_spec in genomic_filter.positions:
+            norm_chrom = _normalize_chromosome(pos_spec.chromosome)
+
+            chrom_cond = or_(
+                chr_col == norm_chrom,
+                chr_col == f"chr{norm_chrom}",
+                chr_col == pos_spec.chromosome,
+            )
+
+            if pos_spec.end:
+                # Range for this position
+                if end_col:
+                    pos_cond = and_(pos_col <= pos_spec.end, end_col >= pos_spec.start)
+                else:
+                    pos_cond = and_(pos_col >= pos_spec.start, pos_col <= pos_spec.end)
+            else:
+                # Exact position
+                pos_cond = pos_col == pos_spec.start
+
+            conditions.append(and_(chrom_cond, pos_cond))
+
+    # Apply genomic conditions (OR logic for multiple positions)
+    if conditions:
+        if len(conditions) == 1:
+            query = query.filter(conditions[0])
+        else:
+            query = query.filter(or_(*conditions))
+
+    # Option 3: Pathway filter (if column exists)
+    if genomic_filter.pathway:
+        pathway_col_name = None
+        for col in ["pathway", "pathway_name", "kegg_pathway", "reactome_pathway"]:
+            if hasattr(model_class, col):
+                pathway_col_name = col
+                break
+
+        if pathway_col_name:
+            pathway_col = getattr(model_class, pathway_col_name)
+            query = query.filter(pathway_col.ilike(f"%{genomic_filter.pathway}%"))
+
+    return query
 
 
 def _build_having_filter(having_clause: HavingClause, agg_expr):
@@ -261,7 +450,7 @@ def _apply_ordering_concatenated(
 
 
 # ==========================================
-#           MAIN API FUNCTION
+# MAIN API FUNCTION
 # ==========================================
 
 
@@ -269,17 +458,21 @@ async def generic_concatenated_aggregate(
     request: ConcatenatedAggregationRequest, table_name: str, db
 ) -> AggregationResponse:
     """
+    Enhanced concatenated aggregation with genomic position filtering.
+
     Concatenates values from multiple columns (e.g., "Ref>Alt") and aggregates them.
-    Supports Scoped Percentages (percentage_by), Group Totals, HAVING clause, ORDER BY, and LIMIT.
+    Supports Scoped Percentages (percentage_by), Group Totals, HAVING clause,
+    ORDER BY, LIMIT, and genomic position filtering.
 
     Query execution order:
     1. FROM table_name
     2. WHERE (filters)
-    3. GROUP BY (group_by + concatenated_value)
-    4. HAVING (having clause on aggregated results)
-    5. ORDER BY (order_by)
-    6. LIMIT (limit)
-    7. SELECT (final result)
+    3. WHERE (genomic_filter) ← NEW
+    4. GROUP BY (group_by + concatenated_value)
+    5. HAVING (having clause on aggregated results)
+    6. ORDER BY (order_by)
+    7. LIMIT (limit)
+    8. SELECT (final result)
     """
     try:
         model_class = get_model_class(table_name)
@@ -298,7 +491,6 @@ async def generic_concatenated_aggregate(
         validate_columns(model_class, request.columns)
         if request.group_by:
             validate_columns(model_class, request.group_by)
-
         if request.percentage_by:
             validate_columns(model_class, request.percentage_by)
 
@@ -314,7 +506,12 @@ async def generic_concatenated_aggregate(
         query = db.query(model_class)
         query = apply_filters(query, model_class, request.filters)
 
-        # 4. Capture Total Records (After WHERE, Before GROUP BY)
+        # 3b. Apply Genomic Position Filters (NEW)
+        query = _apply_genomic_position_filter(
+            query, model_class, request.genomic_filter
+        )
+
+        # 4. Capture Total Records (After WHERE + genomic filters, Before GROUP BY)
         total_records = query.count()
 
         # 5. Aggregation Logic
@@ -349,15 +546,12 @@ async def generic_concatenated_aggregate(
                     partition_attrs = [
                         getattr(model_class, c) for c in request.percentage_by
                     ]
-
                     denominator = func.sum(func.count(concatenated_col)).over(
                         partition_by=partition_attrs
                     )
                     count_col = func.count(concatenated_col)
-
                     # For HAVING, we use the count expression
                     agg_expr = count_col
-
                     extra_selects = [
                         count_col.label("count"),
                         denominator.label("group_total"),
@@ -382,6 +576,11 @@ async def generic_concatenated_aggregate(
                     )
                     .filter(filter_expr)
                     .group_by(*group_attrs, concatenated_col)
+                )
+
+                # Apply genomic filter to grouped query as well
+                grouped_query = _apply_genomic_position_filter(
+                    grouped_query, model_class, request.genomic_filter
                 )
 
                 # Count groups before HAVING
@@ -425,6 +624,7 @@ async def generic_concatenated_aggregate(
 
                 for res in results:
                     item = {}
+
                     # 1. Map Group Columns
                     for i, g_col in enumerate(request.group_by):
                         item[g_col] = res[i]
@@ -435,7 +635,6 @@ async def generic_concatenated_aggregate(
 
                     # 3. Extract Count and Total
                     count_val = res[concat_idx + 1]
-
                     if request.aggregation_type == AggregationType.percentage:
                         if request.percentage_by:
                             group_total = res[concat_idx + 2]
@@ -477,6 +676,11 @@ async def generic_concatenated_aggregate(
                     )
                     .filter(filter_expr)
                     .group_by(*group_attrs)
+                )
+
+                # Apply genomic filter
+                grouped_query = _apply_genomic_position_filter(
+                    grouped_query, model_class, request.genomic_filter
                 )
 
                 # Count groups before HAVING
@@ -536,6 +740,11 @@ async def generic_concatenated_aggregate(
                     )
                     .filter(filter_expr)
                     .group_by(concatenated_col)
+                )
+
+                # Apply genomic filter
+                agg_query = _apply_genomic_position_filter(
+                    agg_query, model_class, request.genomic_filter
                 )
 
                 # Count groups before HAVING
@@ -608,18 +817,17 @@ async def generic_concatenated_aggregate(
 
         # 6. Return Response
         return AggregationResponse(
-            table_name=table_name,
-            column="+".join(request.columns),
-            aggregation_type=request.aggregation_type.value,
             result=final_result,
-            total_records=total_records,
-            groups_before_having=groups_before_having,
-            groups_after_having=groups_after_having,
-            having_applied=request.having is not None,
-            group_totals=group_totals_map if group_totals_map else None,
-            order_by=request.order_by,
-            order_direction=request.order_direction.value,
             limit=request.limit,
+            table_name=table_name,
+            order_by=request.order_by,
+            total_records=total_records,
+            column="+".join(request.columns),
+            groups_after_having=groups_after_having,
+            groups_before_having=groups_before_having,
+            order_direction=request.order_direction.value,
+            aggregation_type=request.aggregation_type.value,
+            group_totals=group_totals_map if group_totals_map else None,
         )
 
     except HTTPException as he:
