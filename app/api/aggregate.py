@@ -470,11 +470,6 @@ async def generic_aggregate(
         # 3. Capture Total Records
         total_records = query.count()
 
-        # Calculate genomic positions count
-        genomic_positions_count = None
-        if request.genomic_filter and request.genomic_filter.positions:
-            genomic_positions_count = len(request.genomic_filter.positions)
-
         # 4. Perform Aggregation
         final_result = None
         group_totals_map = {}
