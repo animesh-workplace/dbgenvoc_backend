@@ -26,8 +26,10 @@ from app.core import (
 # SCHEMAS
 # ==========================================
 
+
 class ComparisonType(str, Enum):
     """Types of dataset comparison"""
+
     mutation_frequency = "mutation_frequency"  # Compare mutation frequencies
     gene_mutation_rate = "gene_mutation_rate"  # Compare gene-level mutation rates
     variant_overlap = "variant_overlap"  # Find shared/unique variants
@@ -37,6 +39,7 @@ class ComparisonType(str, Enum):
 
 class StatisticalTest(str, Enum):
     """Statistical tests for comparison"""
+
     fisher_exact = "fisher_exact"  # Fisher's exact test
     chi_square = "chi_square"  # Chi-square test
     none = "none"  # No statistical test
@@ -44,6 +47,7 @@ class StatisticalTest(str, Enum):
 
 class OrderDirection(str, Enum):
     """Sort order"""
+
     asc = "asc"
     desc = "desc"
 
@@ -53,17 +57,16 @@ class DatasetConfig(BaseModel):
 
     dataset: str = Field(
         ...,
-        description="Dataset name (e.g., 'nibmg_exome_somatic', 'tcga_exome_somatic')"
+        description="Dataset name (e.g., 'nibmg_exome_somatic', 'tcga_exome_somatic')",
     )
 
     label: Optional[str] = Field(
         None,
-        description="Human-readable label for this dataset (defaults to dataset name)"
+        description="Human-readable label for this dataset (defaults to dataset name)",
     )
 
     filters: Optional[ComplexFilter] = Field(
-        None,
-        description="Filters to apply to this dataset"
+        None, description="Filters to apply to this dataset"
     )
 
 
@@ -75,63 +78,52 @@ class CrossDatasetRequest(BaseModel):
         ...,
         min_length=2,
         max_length=10,
-        description="List of datasets to compare (2-10 datasets)"
+        description="List of datasets to compare (2-10 datasets)",
     )
 
     # Comparison type
     comparison_type: ComparisonType = Field(
-        ComparisonType.mutation_frequency,
-        description="Type of comparison to perform"
+        ComparisonType.mutation_frequency, description="Type of comparison to perform"
     )
 
     # Gene filter (optional)
     genes: Optional[List[str]] = Field(
-        None,
-        description="Limit comparison to specific genes"
+        None, description="Limit comparison to specific genes"
     )
 
     # Variant classification filter
     variant_classifications: Optional[List[str]] = Field(
-        None,
-        description="Filter by variant classifications"
+        None, description="Filter by variant classifications"
     )
 
     # Statistical testing
     statistical_test: StatisticalTest = Field(
-        StatisticalTest.fisher_exact,
-        description="Statistical test to apply"
+        StatisticalTest.fisher_exact, description="Statistical test to apply"
     )
 
     p_value_threshold: float = Field(
-        0.05,
-        gt=0,
-        le=1,
-        description="P-value threshold for significance"
+        0.05, gt=0, le=1, description="P-value threshold for significance"
     )
 
     # Overlap analysis parameters
     min_datasets: int = Field(
         2,
         ge=1,
-        description="Minimum number of datasets a variant must appear in (for overlap analysis)"
+        description="Minimum number of datasets a variant must appear in (for overlap analysis)",
     )
 
     # Ordering and limiting
     order_by: Optional[str] = Field(
         None,
-        description="Column to order by (e.g., 'p_value', 'mutation_count', 'frequency_difference')"
+        description="Column to order by (e.g., 'p_value', 'mutation_count', 'frequency_difference')",
     )
 
     order_direction: OrderDirection = Field(
-        OrderDirection.asc,
-        description="Sort direction"
+        OrderDirection.asc, description="Sort direction"
     )
 
     limit: Optional[int] = Field(
-        None,
-        ge=1,
-        le=10000,
-        description="Limit number of results"
+        None, ge=1, le=10000, description="Limit number of results"
     )
 
     @field_validator("datasets")
@@ -187,6 +179,7 @@ class CrossDatasetResponse(BaseModel):
 # INTERNAL HELPERS
 # ==========================================
 
+
 def _get_dataset_label(config: DatasetConfig) -> str:
     """Get label for dataset (use provided label or dataset name)."""
     return config.label if config.label else config.dataset
@@ -196,7 +189,7 @@ def _calculate_fisher_exact(
     dataset1_mutated: int,
     dataset1_total: int,
     dataset2_mutated: int,
-    dataset2_total: int
+    dataset2_total: int,
 ) -> Dict[str, float]:
     """
     Calculate Fisher's exact test for 2x2 contingency table.
@@ -217,34 +210,26 @@ def _calculate_fisher_exact(
         dataset1_wild = dataset1_total - dataset1_mutated
         dataset2_wild = dataset2_total - dataset2_mutated
 
-        table = [
-            [dataset1_mutated, dataset1_wild],
-            [dataset2_mutated, dataset2_wild]
-        ]
+        table = [[dataset1_mutated, dataset1_wild], [dataset2_mutated, dataset2_wild]]
 
         odds_ratio, p_value = fisher_exact(table)
 
-        return {
-            "odds_ratio": round(float(odds_ratio), 4),
-            "p_value": float(p_value)
-        }
+        return {"odds_ratio": round(float(odds_ratio), 4), "p_value": float(p_value)}
 
     except ImportError:
         # Fallback if scipy not available
         return {
             "odds_ratio": 1.0,
             "p_value": 1.0,
-            "note": "scipy not available for statistical testing"
+            "note": "scipy not available for statistical testing",
         }
     except Exception as e:
-        return {
-            "odds_ratio": 1.0,
-            "p_value": 1.0,
-            "error": str(e)
-        }
+        return {"odds_ratio": 1.0, "p_value": 1.0, "error": str(e)}
 
 
-def _calculate_chi_square(observed_counts: List[int], expected_counts: List[int]) -> float:
+def _calculate_chi_square(
+    observed_counts: List[int], expected_counts: List[int]
+) -> float:
     """
     Calculate chi-square statistic.
 
@@ -271,7 +256,7 @@ def _get_dataset_mutations(
     db,
     config: DatasetConfig,
     genes: Optional[List[str]] = None,
-    variant_classifications: Optional[List[str]] = None
+    variant_classifications: Optional[List[str]] = None,
 ) -> Tuple[List[Any], int, Set[str]]:
     """
     Get mutations and metadata for a dataset.
@@ -296,27 +281,32 @@ def _get_dataset_mutations(
             query = apply_filters(query, model_class, config.filters)
 
         # Apply gene filter
-        if genes and hasattr(model_class, 'hugo_symbol'):
+        if genes and hasattr(model_class, "hugo_symbol"):
             query = query.filter(model_class.hugo_symbol.in_(genes))
 
         # Apply variant classification filter
-        if variant_classifications and hasattr(model_class, 'variant_classification'):
-            query = query.filter(model_class.variant_classification.in_(variant_classifications))
+        if variant_classifications and hasattr(model_class, "variant_classification"):
+            query = query.filter(
+                model_class.variant_classification.in_(variant_classifications)
+            )
 
         # Get mutations
         mutations = query.all()
 
         # Get total samples
-        if hasattr(model_class, 'tumor_sample_barcode'):
-            total_samples = db.query(
-                func.count(distinct(model_class.tumor_sample_barcode))
-            ).filter(query.whereclause if hasattr(query, 'whereclause') else True).scalar() or 0
+        if hasattr(model_class, "tumor_sample_barcode"):
+            total_samples = (
+                db.query(func.count(distinct(model_class.tumor_sample_barcode)))
+                .filter(query.whereclause if hasattr(query, "whereclause") else True)
+                .scalar()
+                or 0
+            )
         else:
             total_samples = len(mutations)
 
         # Get unique genes
         unique_genes = set()
-        if hasattr(model_class, 'hugo_symbol'):
+        if hasattr(model_class, "hugo_symbol"):
             for m in mutations:
                 if m.hugo_symbol:
                     unique_genes.add(m.hugo_symbol)
@@ -326,7 +316,7 @@ def _get_dataset_mutations(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to query dataset '{config.dataset}': {str(e)}"
+            detail=f"Failed to query dataset '{config.dataset}': {str(e)}",
         )
 
 
@@ -334,9 +324,9 @@ def _get_dataset_mutations(
 # COMPARISON IMPLEMENTATIONS
 # ==========================================
 
+
 async def _compare_mutation_frequency(
-    db,
-    request: CrossDatasetRequest
+    db, request: CrossDatasetRequest
 ) -> CrossDatasetResponse:
     """
     Compare mutation frequencies across datasets.
@@ -357,53 +347,58 @@ async def _compare_mutation_frequency(
         # Calculate gene-level statistics
         gene_counts = {}
         for mutation in mutations:
-            gene = getattr(mutation, 'hugo_symbol', None)
+            gene = getattr(mutation, "hugo_symbol", None)
             if gene:
                 gene_counts[gene] = gene_counts.get(gene, 0) + 1
 
         dataset_data[label] = {
-            'mutations': mutations,
-            'total_samples': total_samples,
-            'gene_counts': gene_counts,
-            'unique_genes': unique_genes
+            "mutations": mutations,
+            "total_samples": total_samples,
+            "gene_counts": gene_counts,
+            "unique_genes": unique_genes,
         }
 
         dataset_summaries[label] = {
-            'total_mutations': len(mutations),
-            'total_samples': total_samples,
-            'unique_genes': len(unique_genes),
-            'mutation_rate': round(len(mutations) / total_samples, 4) if total_samples > 0 else 0
+            "total_mutations": len(mutations),
+            "total_samples": total_samples,
+            "unique_genes": len(unique_genes),
+            "mutation_rate": round(len(mutations) / total_samples, 4)
+            if total_samples > 0
+            else 0,
         }
 
     # Get all genes across all datasets
     all_genes = set()
     for data in dataset_data.values():
-        all_genes.update(data['unique_genes'])
+        all_genes.update(data["unique_genes"])
 
     # Compare frequencies
     comparison_results = []
 
     for gene in all_genes:
-        gene_result = {'gene': gene}
+        gene_result = {"gene": gene}
 
         # Collect counts for each dataset
         for label, data in dataset_data.items():
-            count = data['gene_counts'].get(gene, 0)
-            total = data['total_samples']
+            count = data["gene_counts"].get(gene, 0)
+            total = data["total_samples"]
             frequency = count / total if total > 0 else 0
 
-            gene_result[f'{label}_count'] = count
-            gene_result[f'{label}_frequency'] = round(frequency, 4)
+            gene_result[f"{label}_count"] = count
+            gene_result[f"{label}_frequency"] = round(frequency, 4)
 
         # Statistical comparison (pairwise for first two datasets)
-        if len(request.datasets) >= 2 and request.statistical_test != StatisticalTest.none:
+        if (
+            len(request.datasets) >= 2
+            and request.statistical_test != StatisticalTest.none
+        ):
             label1 = _get_dataset_label(request.datasets[0])
             label2 = _get_dataset_label(request.datasets[1])
 
-            count1 = dataset_data[label1]['gene_counts'].get(gene, 0)
-            total1 = dataset_data[label1]['total_samples']
-            count2 = dataset_data[label2]['gene_counts'].get(gene, 0)
-            total2 = dataset_data[label2]['total_samples']
+            count1 = dataset_data[label1]["gene_counts"].get(gene, 0)
+            total1 = dataset_data[label1]["total_samples"]
+            count2 = dataset_data[label2]["gene_counts"].get(gene, 0)
+            total2 = dataset_data[label2]["total_samples"]
 
             if request.statistical_test == StatisticalTest.fisher_exact:
                 stats = _calculate_fisher_exact(count1, total1, count2, total2)
@@ -412,47 +407,51 @@ async def _compare_mutation_frequency(
             # Calculate frequency difference
             freq1 = count1 / total1 if total1 > 0 else 0
             freq2 = count2 / total2 if total2 > 0 else 0
-            gene_result['frequency_difference'] = round(abs(freq1 - freq2), 4)
+            gene_result["frequency_difference"] = round(abs(freq1 - freq2), 4)
 
         comparison_results.append(gene_result)
 
     # Filter by p-value if statistical test was applied
     if request.statistical_test != StatisticalTest.none and request.p_value_threshold:
         comparison_results = [
-            r for r in comparison_results 
-            if r.get('p_value', 1.0) <= request.p_value_threshold
+            r
+            for r in comparison_results
+            if r.get("p_value", 1.0) <= request.p_value_threshold
         ]
 
     # Sort results
     if request.order_by:
-        reverse = (request.order_direction == OrderDirection.desc)
+        reverse = request.order_direction == OrderDirection.desc
         comparison_results = sorted(
             comparison_results,
-            key=lambda x: x.get(request.order_by, 0) if x.get(request.order_by) is not None else 0,
-            reverse=reverse
+            key=lambda x: x.get(request.order_by, 0)
+            if x.get(request.order_by) is not None
+            else 0,
+            reverse=reverse,
         )
 
     # Apply limit
     if request.limit:
-        comparison_results = comparison_results[:request.limit]
+        comparison_results = comparison_results[: request.limit]
 
     return CrossDatasetResponse(
         comparison_type=request.comparison_type.value,
         datasets=[_get_dataset_label(c) for c in request.datasets],
         total_results=len(comparison_results),
-        statistical_test=request.statistical_test.value if request.statistical_test != StatisticalTest.none else None,
+        statistical_test=request.statistical_test.value
+        if request.statistical_test != StatisticalTest.none
+        else None,
         p_value_threshold=request.p_value_threshold,
         order_by=request.order_by,
         order_direction=request.order_direction.value,
         limit=request.limit,
         dataset_summaries=dataset_summaries,
-        result=comparison_results
+        result=comparison_results,
     )
 
 
 async def _analyze_variant_overlap(
-    db,
-    request: CrossDatasetRequest
+    db, request: CrossDatasetRequest
 ) -> CrossDatasetResponse:
     """
     Analyze variant overlap across datasets.
@@ -476,11 +475,15 @@ async def _analyze_variant_overlap(
 
         for mutation in mutations:
             # Try to build unique variant key
-            chrom = getattr(mutation, 'chrom', getattr(mutation, 'chromosome', None))
-            pos = getattr(mutation, 'start', getattr(mutation, 'start_position', None))
-            ref = getattr(mutation, 'reference_allele', None)
-            alt = getattr(mutation, 'tumor_seq_allele2', getattr(mutation, 'alternate_allele', None))
-            gene = getattr(mutation, 'hugo_symbol', None)
+            chrom = getattr(mutation, "chrom", getattr(mutation, "chromosome", None))
+            pos = getattr(mutation, "start", getattr(mutation, "start_position", None))
+            ref = getattr(mutation, "reference_allele", None)
+            alt = getattr(
+                mutation,
+                "tumor_seq_allele2",
+                getattr(mutation, "alternate_allele", None),
+            )
+            gene = getattr(mutation, "hugo_symbol", None)
 
             if chrom and pos:
                 if ref and alt:
@@ -490,28 +493,28 @@ async def _analyze_variant_overlap(
 
                 variant_keys.add(key)
                 variant_details[key] = {
-                    'chromosome': chrom,
-                    'position': pos,
-                    'gene': gene,
-                    'reference': ref,
-                    'alternate': alt
+                    "chromosome": chrom,
+                    "position": pos,
+                    "gene": gene,
+                    "reference": ref,
+                    "alternate": alt,
                 }
 
         dataset_data[label] = {
-            'variant_keys': variant_keys,
-            'variant_details': variant_details,
-            'total_samples': total_samples
+            "variant_keys": variant_keys,
+            "variant_details": variant_details,
+            "total_samples": total_samples,
         }
 
         dataset_summaries[label] = {
-            'total_variants': len(variant_keys),
-            'total_samples': total_samples
+            "total_variants": len(variant_keys),
+            "total_samples": total_samples,
         }
 
     # Analyze overlaps
     all_variants = set()
     for data in dataset_data.values():
-        all_variants.update(data['variant_keys'])
+        all_variants.update(data["variant_keys"])
 
     overlap_results = []
 
@@ -519,7 +522,7 @@ async def _analyze_variant_overlap(
         # Count how many datasets have this variant
         datasets_with_variant = []
         for label, data in dataset_data.items():
-            if variant_key in data['variant_keys']:
+            if variant_key in data["variant_keys"]:
                 datasets_with_variant.append(label)
 
         # Filter by min_datasets
@@ -527,36 +530,40 @@ async def _analyze_variant_overlap(
             # Get variant details (from first dataset that has it)
             details = None
             for label in datasets_with_variant:
-                if variant_key in dataset_data[label]['variant_details']:
-                    details = dataset_data[label]['variant_details'][variant_key]
+                if variant_key in dataset_data[label]["variant_details"]:
+                    details = dataset_data[label]["variant_details"][variant_key]
                     break
 
             if details:
-                overlap_results.append({
-                    'variant_key': variant_key,
-                    'chromosome': details['chromosome'],
-                    'position': details['position'],
-                    'gene': details['gene'],
-                    'reference_allele': details['reference'],
-                    'alternate_allele': details['alternate'],
-                    'present_in_datasets': datasets_with_variant,
-                    'dataset_count': len(datasets_with_variant),
-                    'is_shared': len(datasets_with_variant) > 1,
-                    'is_unique': len(datasets_with_variant) == 1
-                })
+                overlap_results.append(
+                    {
+                        "variant_key": variant_key,
+                        "chromosome": details["chromosome"],
+                        "position": details["position"],
+                        "gene": details["gene"],
+                        "reference_allele": details["reference"],
+                        "alternate_allele": details["alternate"],
+                        "present_in_datasets": datasets_with_variant,
+                        "dataset_count": len(datasets_with_variant),
+                        "is_shared": len(datasets_with_variant) > 1,
+                        "is_unique": len(datasets_with_variant) == 1,
+                    }
+                )
 
     # Sort results
     if request.order_by:
-        reverse = (request.order_direction == OrderDirection.desc)
+        reverse = request.order_direction == OrderDirection.desc
         overlap_results = sorted(
             overlap_results,
-            key=lambda x: x.get(request.order_by, 0) if x.get(request.order_by) is not None else 0,
-            reverse=reverse
+            key=lambda x: x.get(request.order_by, 0)
+            if x.get(request.order_by) is not None
+            else 0,
+            reverse=reverse,
         )
 
     # Apply limit
     if request.limit:
-        overlap_results = overlap_results[:request.limit]
+        overlap_results = overlap_results[: request.limit]
 
     return CrossDatasetResponse(
         comparison_type=request.comparison_type.value,
@@ -566,13 +573,12 @@ async def _analyze_variant_overlap(
         order_direction=request.order_direction.value,
         limit=request.limit,
         dataset_summaries=dataset_summaries,
-        result=overlap_results
+        result=overlap_results,
     )
 
 
 async def _compare_sample_statistics(
-    db,
-    request: CrossDatasetRequest
+    db, request: CrossDatasetRequest
 ) -> CrossDatasetResponse:
     """
     Compare sample-level statistics across datasets.
@@ -590,8 +596,11 @@ async def _compare_sample_statistics(
         # Calculate sample-level statistics
         sample_mutation_counts = {}
         for mutation in mutations:
-            sample = getattr(mutation, 'tumor_sample_barcode', 
-                           getattr(mutation, 'sample_id', 'unknown'))
+            sample = getattr(
+                mutation,
+                "tumor_sample_barcode",
+                getattr(mutation, "sample_id", "unknown"),
+            )
             sample_mutation_counts[sample] = sample_mutation_counts.get(sample, 0) + 1
 
         # Calculate statistics
@@ -604,26 +613,23 @@ async def _compare_sample_statistics(
             mean_mutations = max_mutations = min_mutations = 0
 
         dataset_summaries[label] = {
-            'total_samples': total_samples,
-            'total_mutations': len(mutations),
-            'samples_with_mutations': len(sample_mutation_counts),
-            'mean_mutations_per_sample': round(mean_mutations, 2),
-            'max_mutations_per_sample': max_mutations,
-            'min_mutations_per_sample': min_mutations,
-            'unique_genes': len(unique_genes)
+            "total_samples": total_samples,
+            "total_mutations": len(mutations),
+            "samples_with_mutations": len(sample_mutation_counts),
+            "mean_mutations_per_sample": round(mean_mutations, 2),
+            "max_mutations_per_sample": max_mutations,
+            "min_mutations_per_sample": min_mutations,
+            "unique_genes": len(unique_genes),
         }
 
-        comparison_results.append({
-            'dataset': label,
-            **dataset_summaries[label]
-        })
+        comparison_results.append({"dataset": label, **dataset_summaries[label]})
 
     return CrossDatasetResponse(
         comparison_type=request.comparison_type.value,
         datasets=[_get_dataset_label(c) for c in request.datasets],
         total_results=len(comparison_results),
         dataset_summaries=dataset_summaries,
-        result=comparison_results
+        result=comparison_results,
     )
 
 
@@ -631,9 +637,9 @@ async def _compare_sample_statistics(
 # MAIN API FUNCTION
 # ==========================================
 
+
 async def cross_dataset_comparator(
-    request: CrossDatasetRequest,
-    db
+    request: CrossDatasetRequest, db
 ) -> CrossDatasetResponse:
     """
     Compare mutation data across multiple datasets.
@@ -738,13 +744,12 @@ async def cross_dataset_comparator(
         else:
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported comparison type: {request.comparison_type}"
+                detail=f"Unsupported comparison type: {request.comparison_type}",
             )
 
     except HTTPException as he:
         raise he
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Cross-dataset comparison failed: {str(e)}"
+            status_code=500, detail=f"Cross-dataset comparison failed: {str(e)}"
         )
