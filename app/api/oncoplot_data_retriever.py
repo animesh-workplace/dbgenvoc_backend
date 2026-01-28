@@ -27,8 +27,10 @@ from app.core import (
 # SCHEMAS
 # ==========================================
 
+
 class AlterationType(str, Enum):
     """Types of alterations to include"""
+
     mutation = "mutation"  # All mutations
     missense = "missense"  # Missense mutations only
     truncating = "truncating"  # Truncating mutations (nonsense, frameshift)
@@ -39,6 +41,7 @@ class AlterationType(str, Enum):
 
 class SampleSortOrder(str, Enum):
     """Sample sorting methods"""
+
     mutation_count = "mutation_count"  # By total mutations
     alphabetical = "alphabetical"  # Alphabetical by sample ID
     clinical_annotation = "clinical_annotation"  # By clinical variable
@@ -47,6 +50,7 @@ class SampleSortOrder(str, Enum):
 
 class GeneSortOrder(str, Enum):
     """Gene sorting methods"""
+
     mutation_frequency = "mutation_frequency"  # By mutation frequency
     alphabetical = "alphabetical"  # Alphabetical
     custom = "custom"  # Custom order provided
@@ -58,7 +62,7 @@ class OncoplotRequest(BaseModel):
     # Dataset to query
     dataset: str = Field(
         ...,
-        description="Dataset name (e.g., 'nibmg_exome_somatic', 'tcga_exome_somatic')"
+        description="Dataset name (e.g., 'nibmg_exome_somatic', 'tcga_exome_somatic')",
     )
 
     # Genes to include
@@ -66,66 +70,55 @@ class OncoplotRequest(BaseModel):
         ...,
         min_length=1,
         max_length=100,
-        description="Gene symbols to include in oncoplot (1-100 genes)"
+        description="Gene symbols to include in oncoplot (1-100 genes)",
     )
 
     # Sample filters
     sample_ids: Optional[List[str]] = Field(
-        None,
-        description="Specific sample IDs to include (if None, includes all)"
+        None, description="Specific sample IDs to include (if None, includes all)"
     )
 
     # Alteration type
     alteration_types: List[AlterationType] = Field(
-        [AlterationType.all],
-        description="Types of alterations to include"
+        [AlterationType.all], description="Types of alterations to include"
     )
 
     # Sorting
     gene_sort_order: GeneSortOrder = Field(
-        GeneSortOrder.mutation_frequency,
-        description="How to sort genes"
+        GeneSortOrder.mutation_frequency, description="How to sort genes"
     )
 
     sample_sort_order: SampleSortOrder = Field(
-        SampleSortOrder.mutation_count,
-        description="How to sort samples"
+        SampleSortOrder.mutation_count, description="How to sort samples"
     )
 
     custom_gene_order: Optional[List[str]] = Field(
-        None,
-        description="Custom gene order (for gene_sort_order='custom')"
+        None, description="Custom gene order (for gene_sort_order='custom')"
     )
 
     custom_sample_order: Optional[List[str]] = Field(
-        None,
-        description="Custom sample order (for sample_sort_order='custom')"
+        None, description="Custom sample order (for sample_sort_order='custom')"
     )
 
     # Clinical annotation
     clinical_annotation: Optional[str] = Field(
         None,
-        description="Clinical variable for annotation track (e.g., 'cancer_type', 'stage')"
+        description="Clinical variable for annotation track (e.g., 'cancer_type', 'stage')",
     )
 
     # Additional filters
     filters: Optional[ComplexFilter] = Field(
-        None,
-        description="Complex filters with AND/OR logic"
+        None, description="Complex filters with AND/OR logic"
     )
 
     # Include mutation details
     include_mutation_details: bool = Field(
-        False,
-        description="Include detailed mutation information in response"
+        False, description="Include detailed mutation information in response"
     )
 
     # Limits
     max_samples: Optional[int] = Field(
-        None,
-        ge=1,
-        le=10000,
-        description="Maximum number of samples to include"
+        None, ge=1, le=10000, description="Maximum number of samples to include"
     )
 
     @field_validator("custom_gene_order")
@@ -137,7 +130,9 @@ class OncoplotRequest(BaseModel):
             gene_sort = info.data.get("gene_sort_order")
 
             if gene_sort == GeneSortOrder.custom and set(v) != set(genes):
-                raise ValueError("custom_gene_order must contain exactly the same genes as 'genes'")
+                raise ValueError(
+                    "custom_gene_order must contain exactly the same genes as 'genes'"
+                )
         return v
 
 
@@ -155,7 +150,9 @@ class OncoplotResponse(BaseModel):
 
     # Mutation matrix (genes × samples)
     # Each cell contains alteration type(s)
-    alteration_matrix: Dict[str, Dict[str, List[str]]]  # gene -> sample -> [alteration_types]
+    alteration_matrix: Dict[
+        str, Dict[str, List[str]]
+    ]  # gene -> sample -> [alteration_types]
 
     # Summary statistics
     gene_alteration_frequency: Dict[str, float]  # gene -> frequency
@@ -172,6 +169,7 @@ class OncoplotResponse(BaseModel):
 # INTERNAL HELPERS
 # ==========================================
 
+
 def _classify_alteration_type(mutation: Any) -> str:
     """
     Classify mutation into alteration category.
@@ -182,43 +180,39 @@ def _classify_alteration_type(mutation: Any) -> str:
     Returns:
         Alteration type string
     """
-    variant_class = getattr(mutation, 'variant_classification', None)
+    variant_class = getattr(mutation, "variant_classification", None)
 
     if not variant_class:
-        return 'mutation'
+        return "mutation"
 
     # Truncating mutations
     truncating = [
-        'Nonsense_Mutation',
-        'Frame_Shift_Del',
-        'Frame_Shift_Ins',
-        'Frameshift_Deletion',
-        'Frameshift_Insertion',
-        'Splice_Site'
+        "Nonsense_Mutation",
+        "Frame_Shift_Del",
+        "Frame_Shift_Ins",
+        "Frameshift_Deletion",
+        "Frameshift_Insertion",
+        "Splice_Site",
     ]
 
     # Inframe mutations
-    inframe = [
-        'In_Frame_Del',
-        'In_Frame_Ins'
-    ]
+    inframe = ["In_Frame_Del", "In_Frame_Ins"]
 
     # Missense
-    if variant_class == 'Missense_Mutation':
-        return 'missense'
+    if variant_class == "Missense_Mutation":
+        return "missense"
     elif variant_class in truncating:
-        return 'truncating'
+        return "truncating"
     elif variant_class in inframe:
-        return 'inframe'
-    elif 'Splice' in variant_class:
-        return 'splice_site'
+        return "inframe"
+    elif "Splice" in variant_class:
+        return "splice_site"
     else:
-        return 'mutation'
+        return "mutation"
 
 
 def _filter_by_alteration_type(
-    mutations: List[Any],
-    alteration_types: List[AlterationType]
+    mutations: List[Any], alteration_types: List[AlterationType]
 ) -> List[Any]:
     """
     Filter mutations by alteration type.
@@ -238,17 +232,16 @@ def _filter_by_alteration_type(
         alt_type = _classify_alteration_type(mutation)
 
         # Check if this alteration type is requested
-        if any(alt_type == at.value for at in alteration_types if at != AlterationType.all):
+        if any(
+            alt_type == at.value for at in alteration_types if at != AlterationType.all
+        ):
             filtered.append(mutation)
 
     return filtered
 
 
 def _get_clinical_annotations(
-    db,
-    model_class,
-    sample_ids: List[str],
-    annotation_column: str
+    db, model_class, sample_ids: List[str], annotation_column: str
 ) -> Dict[str, Any]:
     """
     Get clinical annotations for samples.
@@ -268,7 +261,7 @@ def _get_clinical_annotations(
 
         # Get sample column name
         sample_col_name = None
-        for col in ['tumor_sample_barcode', 'sample_id', 'sample']:
+        for col in ["tumor_sample_barcode", "sample_id", "sample"]:
             if hasattr(model_class, col):
                 sample_col_name = col
                 break
@@ -280,12 +273,12 @@ def _get_clinical_annotations(
         annotation_col = getattr(model_class, annotation_column)
 
         # Query annotations
-        results = db.query(
-            sample_col,
-            annotation_col
-        ).filter(
-            sample_col.in_(sample_ids)
-        ).distinct().all()
+        results = (
+            db.query(sample_col, annotation_col)
+            .filter(sample_col.in_(sample_ids))
+            .distinct()
+            .all()
+        )
 
         # Build dictionary
         annotations = {}
@@ -305,10 +298,9 @@ def _get_clinical_annotations(
 # MAIN API FUNCTION
 # ==========================================
 
+
 async def oncoplot_data_retriever(
-    request: OncoplotRequest,
-    table_name: str,
-    db
+    request: OncoplotRequest, table_name: str, db
 ) -> OncoplotResponse:
     """
     Retrieve data formatted for oncoplot/OncoPrint visualization.
@@ -407,25 +399,24 @@ async def oncoplot_data_retriever(
             query = apply_filters(query, model_class, request.filters)
 
         # Filter by genes
-        if hasattr(model_class, 'hugo_symbol'):
-            query = query.filter(model_class.hugo_symbol.in_(request.genes))
+        if hasattr(model_class, "gene"):
+            query = query.filter(model_class.gene.in_(request.genes))
         else:
             raise HTTPException(
                 status_code=400,
-                detail="Dataset must have 'hugo_symbol' column for oncoplot generation"
+                detail="Dataset must have 'gene' column for oncoplot generation",
             )
 
         # Filter by samples if specified
         sample_col_name = None
-        for col in ['tumor_sample_barcode', 'sample_id', 'sample']:
+        for col in ["tumor_sample_barcode", "sample_id", "sample"]:
             if hasattr(model_class, col):
                 sample_col_name = col
                 break
 
         if not sample_col_name:
             raise HTTPException(
-                status_code=400,
-                detail="Dataset must have sample identifier column"
+                status_code=400, detail="Dataset must have sample identifier column"
             )
 
         sample_col = getattr(model_class, sample_col_name)
@@ -448,7 +439,7 @@ async def oncoplot_data_retriever(
         mutation_details_list = []
 
         for mutation in mutations:
-            gene = getattr(mutation, 'hugo_symbol')
+            gene = getattr(mutation, "gene")
             sample = getattr(mutation, sample_col_name)
             alt_type = _classify_alteration_type(mutation)
 
@@ -463,25 +454,38 @@ async def oncoplot_data_retriever(
 
                 # Store mutation details if requested
                 if request.include_mutation_details:
-                    mutation_details_list.append({
-                        'gene': gene,
-                        'sample': sample,
-                        'alteration_type': alt_type,
-                        'variant_classification': getattr(mutation, 'variant_classification', None),
-                        'protein_change': getattr(mutation, 'hgvsp_short', 
-                                                 getattr(mutation, 'protein_change', None)),
-                        'chromosome': getattr(mutation, 'chrom', 
-                                            getattr(mutation, 'chromosome', None)),
-                        'position': getattr(mutation, 'start', 
-                                          getattr(mutation, 'start_position', None))
-                    })
+                    mutation_details_list.append(
+                        {
+                            "gene": gene,
+                            "sample": sample,
+                            "alteration_type": alt_type,
+                            "variant_classification": getattr(
+                                mutation, "variant_classification", None
+                            ),
+                            "protein_change": getattr(
+                                mutation,
+                                "hgvsp_short",
+                                getattr(mutation, "protein_change", None),
+                            ),
+                            "chromosome": getattr(
+                                mutation, "chrom", getattr(mutation, "chromosome", None)
+                            ),
+                            "position": getattr(
+                                mutation,
+                                "start",
+                                getattr(mutation, "start_position", None),
+                            ),
+                        }
+                    )
 
         # Get all samples (including those with no mutations in selected genes)
         if not request.sample_ids:
             # Query all samples in dataset
             all_samples_query = db.query(distinct(sample_col))
             if request.filters:
-                all_samples_query = apply_filters(all_samples_query, model_class, request.filters)
+                all_samples_query = apply_filters(
+                    all_samples_query, model_class, request.filters
+                )
             all_samples_result = all_samples_query.all()
             all_samples = set(row[0] for row in all_samples_result if row[0])
 
@@ -493,16 +497,16 @@ async def oncoplot_data_retriever(
             sorted_samples = sorted(
                 all_samples,
                 key=lambda s: sample_mutation_counts.get(s, 0),
-                reverse=True
+                reverse=True,
             )
-            all_samples = sorted_samples[:request.max_samples]
+            all_samples = sorted_samples[: request.max_samples]
 
         # Sort genes
         if request.gene_sort_order == GeneSortOrder.mutation_frequency:
             sorted_genes = sorted(
                 request.genes,
                 key=lambda g: gene_mutation_counts.get(g, 0),
-                reverse=True
+                reverse=True,
             )
         elif request.gene_sort_order == GeneSortOrder.alphabetical:
             sorted_genes = sorted(request.genes)
@@ -516,7 +520,7 @@ async def oncoplot_data_retriever(
             sorted_samples = sorted(
                 all_samples,
                 key=lambda s: sample_mutation_counts.get(s, 0),
-                reverse=True
+                reverse=True,
             )
         elif request.sample_sort_order == SampleSortOrder.alphabetical:
             sorted_samples = sorted(all_samples)
@@ -528,7 +532,9 @@ async def oncoplot_data_retriever(
         # Calculate gene alteration frequencies
         total_samples = len(all_samples)
         gene_alteration_frequency = {
-            gene: gene_mutation_counts.get(gene, 0) / total_samples if total_samples > 0 else 0
+            gene: gene_mutation_counts.get(gene, 0) / total_samples
+            if total_samples > 0
+            else 0
             for gene in sorted_genes
         }
 
@@ -536,23 +542,21 @@ async def oncoplot_data_retriever(
         clinical_annotation_data = None
         if request.clinical_annotation:
             clinical_annotation_data = _get_clinical_annotations(
-                db,
-                model_class,
-                all_samples,
-                request.clinical_annotation
+                db, model_class, all_samples, request.clinical_annotation
             )
 
             # Sort by clinical annotation if requested
-            if request.sample_sort_order == SampleSortOrder.clinical_annotation and clinical_annotation_data:
+            if (
+                request.sample_sort_order == SampleSortOrder.clinical_annotation
+                and clinical_annotation_data
+            ):
                 sorted_samples = sorted(
-                    all_samples,
-                    key=lambda s: clinical_annotation_data.get(s, '')
+                    all_samples, key=lambda s: clinical_annotation_data.get(s, "")
                 )
 
         # Convert alteration_matrix to regular dict for JSON serialization
         alteration_matrix_dict = {
-            gene: dict(alteration_matrix[gene])
-            for gene in sorted_genes
+            gene: dict(alteration_matrix[gene]) for gene in sorted_genes
         }
 
         return OncoplotResponse(
@@ -566,21 +570,23 @@ async def oncoplot_data_retriever(
             gene_alteration_frequency=gene_alteration_frequency,
             sample_alteration_count=dict(sample_mutation_counts),
             clinical_annotation=clinical_annotation_data,
-            mutation_details=mutation_details_list if request.include_mutation_details else None
+            mutation_details=mutation_details_list
+            if request.include_mutation_details
+            else None,
         )
 
     except HTTPException as he:
         raise he
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Oncoplot data retrieval failed: {str(e)}"
+            status_code=500, detail=f"Oncoplot data retrieval failed: {str(e)}"
         )
 
 
 # ==========================================
 # UTILITY FUNCTIONS
 # ==========================================
+
 
 def format_for_complexheatmap(response: OncoplotResponse) -> Dict[str, Any]:
     """
@@ -600,18 +606,18 @@ def format_for_complexheatmap(response: OncoplotResponse) -> Dict[str, Any]:
             alterations = response.alteration_matrix.get(gene, {}).get(sample, [])
             if alterations:
                 # Combine multiple alteration types
-                row.append(';'.join(alterations))
+                row.append(";".join(alterations))
             else:
-                row.append('')
+                row.append("")
         matrix.append(row)
 
     return {
-        'genes': response.genes,
-        'samples': response.samples,
-        'matrix': matrix,
-        'gene_frequencies': response.gene_alteration_frequency,
-        'sample_counts': response.sample_alteration_count,
-        'clinical_annotation': response.clinical_annotation
+        "genes": response.genes,
+        "samples": response.samples,
+        "matrix": matrix,
+        "gene_frequencies": response.gene_alteration_frequency,
+        "sample_counts": response.sample_alteration_count,
+        "clinical_annotation": response.clinical_annotation,
     }
 
 
@@ -632,12 +638,14 @@ def format_for_maftools(response: OncoplotResponse) -> List[Dict[str, Any]]:
             alterations = response.alteration_matrix.get(gene, {}).get(sample, [])
             if alterations:
                 for alt_type in alterations:
-                    records.append({
-                        'Hugo_Symbol': gene,
-                        'Tumor_Sample_Barcode': sample,
-                        'Variant_Classification': alt_type,
-                        'Variant_Type': 'SNP'  # Simplified
-                    })
+                    records.append(
+                        {
+                            "Hugo_Symbol": gene,
+                            "Tumor_Sample_Barcode": sample,
+                            "Variant_Classification": alt_type,
+                            "Variant_Type": "SNP",  # Simplified
+                        }
+                    )
 
     return records
 
