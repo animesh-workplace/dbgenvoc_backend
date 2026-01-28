@@ -1,102 +1,21 @@
-from enum import Enum
+from sqlalchemy import func
 from fastapi import HTTPException
-from sqlalchemy import func, and_, or_
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field, field_validator
-from app.abstract import Genelist, Pathway, pathway_gene_association
-from app.schema_new import ComplexFilter, HavingClause, HavingCondition
+from app.core import get_model_class, validate_columns, apply_filters
+from app.api.utils import _apply_genomic_position_filter, _build_having_filter
+from app.api.schema import (
+    SortOrder,
+    HavingClause,
+    ComplexFilter,
+    AggregationType,
+    GenomicPositionFilter,
+)
 
 
 # ==========================================
 # AGGREGATION SCHEMAS
 # ==========================================
-
-
-class GenomicRegion(BaseModel):
-    """
-    Single genomic region specification.
-
-    Can represent either:
-    - Exact position: Provide chromosome + start only
-    - Range: Provide chromosome + start + end
-
-    Examples:
-        Exact position: {"chromosome": "chr17", "start": 7577538}
-        Range: {"chromosome": "chr17", "start": 7577000, "end": 7579000}
-    """
-
-    chromosome: str = Field(
-        ..., description="Chromosome name (e.g., 'chr1', '1', 'X', 'Y', 'MT')"
-    )
-    start: int = Field(..., ge=1, description="Start position (1-based, inclusive)")
-    end: Optional[int] = Field(
-        None,
-        ge=1,
-        description="End position (1-based, inclusive). Omit for exact position match.",
-    )
-
-    @field_validator("end")
-    @classmethod
-    def validate_end_after_start(cls, v, info):
-        if v is not None:
-            start = info.data.get("start")
-            if start and v < start:
-                raise ValueError("end must be >= start")
-        return v
-
-
-class GenomicPositionFilter(BaseModel):
-    """
-    Genomic position filtering - unified approach.
-    """
-
-    positions: Optional[List[GenomicRegion]] = Field(
-        None,
-        description=(
-            "List of genomic positions or ranges. "
-            "Can mix exact positions (start only) and ranges (start + end). "
-            "All conditions combined with OR logic - matches ANY position/range."
-        ),
-    )
-
-    pathway_ids: Optional[List[str]] = Field(
-        None,
-        description=(
-            "Filter by exact pathway IDs from autocomplete. "
-            "Example: ['hsa04151', 'hsa04115'] for KEGG pathways"
-        ),
-    )
-
-    pathway_names: Optional[List[str]] = Field(
-        None,
-        description=(
-            "Filter by pathway names (case-insensitive partial match). "
-            "Returns variants in genes associated with ANY of the specified pathways. "
-            "Examples: ['PI3K-AKT signaling', 'TP53 pathway'] or ['DNA repair']"
-        ),
-    )
-
-    @field_validator("pathway_names")
-    @classmethod
-    def validate_pathway_names_not_empty(cls, v):
-        if v is not None and len(v) == 0:
-            raise ValueError("pathway_names list cannot be empty")
-        return v
-
-
-class AggregationType(str, Enum):
-    sum = "sum"
-    avg = "avg"
-    min = "min"
-    max = "max"
-    count = "count"
-    percentage = "percentage"
-    distinct_count = "distinct_count"
-
-
-class OrderDirection(str, Enum):
-    asc = "asc"
-    desc = "desc"
 
 
 class AggregationRequest(BaseModel):
@@ -111,7 +30,6 @@ class AggregationRequest(BaseModel):
         None, description="Complex filters with AND/OR logic (applied before GROUP BY)"
     )
 
-    # --- Genomic Position Filters (UNIFIED) ---
     genomic_filter: Optional[GenomicPositionFilter] = Field(
         None,
         description="Filter by genomic positions/ranges or pathway (applied before GROUP BY)",
@@ -131,8 +49,8 @@ class AggregationRequest(BaseModel):
         description="Column(s) to order results by. Use 'aggregated_value' for ordering by the aggregation result.",
     )
 
-    order_direction: OrderDirection = Field(
-        OrderDirection.desc, description="Order direction: asc or desc"
+    order_direction: SortOrder = Field(
+        SortOrder.DESC, description="Order direction: asc or desc"
     )
 
     limit: Optional[int] = Field(
@@ -198,137 +116,6 @@ class AggregationResponse(BaseModel):
 # ==========================================
 
 
-def _normalize_chromosome(chrom: str) -> str:
-    """
-    Normalize chromosome name for flexible matching.
-
-    Examples:
-        'chr1' -> '1'
-        'CHR17' -> '17'
-        '17' -> '17'
-        'chrX' -> 'X'
-    """
-    if not chrom:
-        return chrom
-    chrom_str = str(chrom).upper()
-    if chrom_str.startswith("CHR"):
-        return chrom_str[3:]
-    return chrom_str
-
-
-def _apply_genomic_position_filter(
-    query, model_class, genomic_filter: Optional[GenomicPositionFilter]
-):
-    """
-    Apply genomic position filtering to query (unified approach).
-
-    Features:
-    1. Unified positions list - mix ranges and exact positions
-    2. Flexible chromosome naming ('chr17' or '17')
-    3. Overlap detection (if dataset has 'end' column)
-    4. Exact position matching (if no 'end' column)
-    5. Pathway filtering (if pathway column exists)
-    6. OR logic - match ANY position/range
-
-    Args:
-        query: SQLAlchemy query
-        model_class: Model class
-        genomic_filter: GenomicPositionFilter object
-
-    Returns:
-        Filtered query
-    """
-    if not genomic_filter:
-        return query
-
-    # Detect chromosome and position column names in the dataset
-    chr_col_name = "chrom"
-    pos_col_name = "start"
-    end_col_name = "end"
-
-    if not chr_col_name or not pos_col_name:
-        raise HTTPException(
-            400,
-            detail=(
-                "Dataset must have chromosome and position columns for genomic filtering. "
-                f"Found columns: {[c.name for c in model_class.__table__.columns]}"
-            ),
-        )
-
-    chr_col = getattr(model_class, chr_col_name)
-    pos_col = getattr(model_class, pos_col_name)
-    end_col = getattr(model_class, end_col_name) if end_col_name else None
-
-    # Build genomic position conditions
-    conditions = []
-
-    if genomic_filter.positions:
-        for region in genomic_filter.positions:
-            norm_chrom = _normalize_chromosome(region.chromosome)
-
-            # Flexible chromosome matching
-            chrom_cond = or_(
-                chr_col == norm_chrom,
-                chr_col == f"chr{norm_chrom}",
-                chr_col == region.chromosome,
-                chr_col == region.chromosome.upper(),
-                chr_col == region.chromosome.lower(),
-            )
-
-            if region.end:
-                # Range query
-                if end_col:
-                    # Overlap detection
-                    pos_cond = and_(pos_col <= region.end, end_col >= region.start)
-                else:
-                    # Position within range
-                    pos_cond = and_(pos_col >= region.start, pos_col <= region.end)
-            else:
-                # Exact position match
-                pos_cond = pos_col == region.start
-
-            conditions.append(and_(chrom_cond, pos_cond))
-
-    # Apply all genomic conditions with OR logic
-    if conditions:
-        if len(conditions) == 1:
-            query = query.filter(conditions[0])
-        else:
-            query = query.filter(or_(*conditions))
-
-    # Apply pathway filter (independent of positions)
-    if genomic_filter.pathway_names:
-        query = (
-            query.join(Genelist, model_class.gene == Genelist.gene)
-            .join(
-                pathway_gene_association,
-                Genelist.gene == pathway_gene_association.c.gene,
-            )
-            .join(
-                Pathway,
-                pathway_gene_association.c.pathway_id == Pathway.id,
-            )
-            .filter(Pathway.pathway_name.in_(genomic_filter.pathway_names))
-            .distinct()
-        )
-
-    # Apply pathway filter with exact ID matching
-    if genomic_filter.pathway_ids:
-        query = (
-            query.join(Genelist, model_class.gene == Genelist.gene)
-            .join(
-                pathway_gene_association,
-                Genelist.gene == pathway_gene_association.c.gene,
-            )
-            .filter(
-                pathway_gene_association.c.pathway_id.in_(genomic_filter.pathway_ids)
-            )
-            .distinct()
-        )
-
-    return query
-
-
 async def _calculate_standard_agg(query, col_attr, agg_type: AggregationType):
     """Handles standard scalar aggregations."""
     funcs = {
@@ -351,33 +138,6 @@ async def _calculate_global_percentage(query, db, model_class, col_attr):
     return round((numerator / denominator) * 100, 2)
 
 
-def _build_having_filter(having_clause: HavingClause, agg_expr):
-    """Recursively builds SQLAlchemy HAVING conditions."""
-    conditions = []
-
-    for condition in having_clause.conditions:
-        if isinstance(condition, HavingCondition):
-            if condition.operator == "eq":
-                conditions.append(agg_expr == condition.value)
-            elif condition.operator == "neq":
-                conditions.append(agg_expr != condition.value)
-            elif condition.operator == "gt":
-                conditions.append(agg_expr > condition.value)
-            elif condition.operator == "gte":
-                conditions.append(agg_expr >= condition.value)
-            elif condition.operator == "lt":
-                conditions.append(agg_expr < condition.value)
-            elif condition.operator == "lte":
-                conditions.append(agg_expr <= condition.value)
-        else:
-            conditions.append(_build_having_filter(condition, agg_expr))
-
-    if having_clause.logic == "AND":
-        return and_(*conditions)
-    else:
-        return or_(*conditions)
-
-
 def _apply_ordering(
     query, order_by, order_direction, group_attrs, agg_expr, group_by_columns
 ):
@@ -385,7 +145,7 @@ def _apply_ordering(
     order_clauses = []
 
     def add_order_clause(column_expr):
-        if order_direction == OrderDirection.desc:
+        if order_direction == SortOrder.DESC:
             return column_expr.desc()
         else:
             return column_expr.asc()
@@ -441,8 +201,6 @@ async def generic_aggregate(
     8. SELECT (final result)
     """
     try:
-        from app.core import get_model_class, validate_columns, apply_filters
-
         model_class = get_model_class(table_name)
 
         # 1. Validation
