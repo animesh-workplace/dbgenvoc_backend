@@ -5,7 +5,7 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Query
 from fastapi import HTTPException
 from typing import List, Dict, Any, Union
-from app.schema_new import ComplexFilter, FilterCondition
+from app.api.schema import ComplexFilter, FilterCondition
 from sqlalchemy.sql.sqltypes import Numeric, Float, Integer, DECIMAL
 
 # Table registry mapping table names to models
@@ -106,15 +106,17 @@ def _build_filter_expression(
         val = filter_data.value
 
         ops = {
-            "eq": lambda: attr == val,
-            "neq": lambda: attr != val,
             "gt": lambda: attr > val,
             "lt": lambda: attr < val,
+            "eq": lambda: attr == val,
+            "neq": lambda: attr != val,
+            "gte": lambda: attr >= val,
+            "lte": lambda: attr <= val,
+            "like": lambda: attr.like(f"%{val}%"),
             "in": lambda: attr.in_(val) if isinstance(val, list) else attr.in_([val]),
             "not_in": lambda: ~attr.in_(val)
             if isinstance(val, list)
             else ~attr.in_([val]),
-            "like": lambda: attr.like(f"%{val}%"),
         }
         return ops.get(filter_data.operator, lambda: attr == val)()
 
