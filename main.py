@@ -47,7 +47,11 @@ from app.api.oncoplot_data_retriever import (
     format_for_complexheatmap,
     format_for_maftools,
 )
-
+from app.api.cross_dataset_comparator import (
+    cross_dataset_comparator,
+    CrossDatasetRequest,
+    CrossDatasetResponse,
+)
 
 api_router = APIRouter()
 BASE_URL = "/dbgenvoc/api/v2"
@@ -191,6 +195,14 @@ async def retrieve_oncoplot_data(
     table_name: str, request: OncoplotRequest, db: Session = Depends(get_db)
 ):
     return await oncoplot_data_retriever(request, table_name, db)
+
+
+@api_router.post("/cross_dataset_comparator", response_model=CrossDatasetResponse)
+async def cross_dataset_comparator_endpoint(
+    request: CrossDatasetRequest,
+    db: Session = Depends(get_db),
+):
+    return await cross_dataset_comparator(request, db)
 
 
 @api_router.get("/ask")
