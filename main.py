@@ -36,9 +36,18 @@ from app.api.autocomplete import (
     AutocompleteRequest,
     unified_autocomplete,
 )
-from app.schema import (
+
+# from app.schema import (
+#     OncoplotRequest,
+# )
+from app.api.oncoplot_data_retriever import (
+    oncoplot_data_retriever,
     OncoplotRequest,
+    OncoplotResponse,
+    format_for_complexheatmap,
+    format_for_maftools,
 )
+
 
 api_router = APIRouter()
 BASE_URL = "/dbgenvoc/api/v2"
@@ -173,6 +182,15 @@ async def variant_finder(
     ),
 ):
     return await proximity_variant_finder(request=request, table_name=table_name, db=db)
+
+
+@api_router.post(
+    "/{table_name}/oncoplot_data_retriever", response_model=OncoplotResponse
+)
+async def retrieve_oncoplot_data(
+    table_name: str, request: OncoplotRequest, db: Session = Depends(get_db)
+):
+    return await oncoplot_data_retriever(request, table_name, db)
 
 
 @api_router.get("/ask")
