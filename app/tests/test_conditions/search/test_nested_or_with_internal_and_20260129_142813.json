@@ -1,0 +1,335 @@
+{
+  "url": "http://10.10.6.80/dbgenvoc/api/v2/nibmg_exome_somatic_variants/search",
+  "name": "nested_or_with_internal_and",
+  "timestamp": "20260129_142813",
+  "request": {
+    "page": 1,
+    "page_size": 8,
+    "filters": {
+      "logic": "OR",
+      "conditions": [
+        {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "gene",
+              "operator": "eq",
+              "value": "TP53"
+            },
+            {
+              "column": "chrom",
+              "operator": "eq",
+              "value": "chr17"
+            },
+            {
+              "column": "start",
+              "operator": "gte",
+              "value": "7570000"
+            },
+            {
+              "column": "start",
+              "operator": "lte",
+              "value": "7590000"
+            }
+          ]
+        },
+        {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "gene",
+              "operator": "eq",
+              "value": "EGFR"
+            },
+            {
+              "column": "chrom",
+              "operator": "eq",
+              "value": "chr7"
+            },
+            {
+              "column": "variant_class",
+              "operator": "in",
+              "value": [
+                "Missense_Mutation",
+                "In_Frame_Del"
+              ]
+            }
+          ]
+        },
+        {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "gene",
+              "operator": "eq",
+              "value": "HRAS"
+            },
+            {
+              "column": "chrom",
+              "operator": "eq",
+              "value": "chr11"
+            },
+            {
+              "column": "cDNA_change",
+              "operator": "like",
+              "value": "c.35"
+            }
+          ]
+        }
+      ]
+    },
+    "sort_by": "gene",
+    "sort_order": "asc"
+  },
+  "expected_checks": [
+    "Status code should be 200",
+    "Results should contain only TP53, EGFR, or HRAS mutations",
+    "TP53 results should be on chr17 between positions 7,570,000-7,590,000",
+    "EGFR results should be on chr7 and be Missense or Inframe deletions",
+    "HRAS results should be on chr11 with cDNA_change containing 'c.35'",
+    "Results should be sorted alphabetically by gene",
+    "Results count should be <= 8"
+  ],
+  "actual_response": {
+    "status_code": 200,
+    "response_body": {
+      "page": 1,
+      "page_size": 8,
+      "table_name": "nibmg_exome_somatic_variants",
+      "sort_order": "asc",
+      "total_results": 78,
+      "sort_by": "gene",
+      "search_term": null,
+      "results": [
+        {
+          "remarks": "-",
+          "end": "534288",
+          "chrom": "chr11",
+          "start": "534288",
+          "disease": "OSCC_GB",
+          "ncbi_build": "37",
+          "dbsnp_rs": "rs104894230",
+          "ref_allele": "C",
+          "reference": "NIBMG",
+          "entrez_gene_id": 3265.0,
+          "cDNA_change": "c.35G>A",
+          "variant_type": "SNP",
+          "codon_change": "c.(34-36)gGc>gAc",
+          "genome_change": "g.chr11:534288C>T",
+          "variant_class": "Missense_Mutation",
+          "protein_change": "p.G12D",
+          "reference_url": "https://www.nibmg.ac.in/",
+          "transcript_exon": "2",
+          "transcript_strand": "-",
+          "tumor_seq_allele2": "T",
+          "transcript_position": "222",
+          "annotation_transcript": "ENST00000451590.1",
+          "tumor_sample_barcode": "NIBMG-T640-GB",
+          "variant_id": 3568.0,
+          "gene": "HRAS"
+        },
+        {
+          "remarks": "-",
+          "end": "534288",
+          "chrom": "chr11",
+          "start": "534288",
+          "disease": "OSCC_GB",
+          "ncbi_build": "37",
+          "dbsnp_rs": "rs104894230",
+          "ref_allele": "C",
+          "reference": "NIBMG",
+          "entrez_gene_id": 3265.0,
+          "cDNA_change": "c.35G>A",
+          "variant_type": "SNP",
+          "codon_change": "c.(34-36)gGc>gAc",
+          "genome_change": "g.chr11:534288C>T",
+          "variant_class": "Missense_Mutation",
+          "protein_change": "p.G12D",
+          "reference_url": "https://www.nibmg.ac.in/",
+          "transcript_exon": "2",
+          "transcript_strand": "-",
+          "tumor_seq_allele2": "T",
+          "transcript_position": "222",
+          "annotation_transcript": "ENST00000451590.1",
+          "tumor_sample_barcode": "NIBMG-P481-GB",
+          "variant_id": 3570.0,
+          "gene": "HRAS"
+        },
+        {
+          "remarks": "-",
+          "end": "534288",
+          "chrom": "chr11",
+          "start": "534288",
+          "disease": "OSCC_GB",
+          "ncbi_build": "37",
+          "dbsnp_rs": "rs104894230",
+          "ref_allele": "C",
+          "reference": "NIBMG",
+          "entrez_gene_id": 3265.0,
+          "cDNA_change": "c.35G>C",
+          "variant_type": "SNP",
+          "codon_change": "c.(34-36)gGc>gCc",
+          "genome_change": "g.chr11:534288C>G",
+          "variant_class": "Missense_Mutation",
+          "protein_change": "p.G12A",
+          "reference_url": "https://www.nibmg.ac.in/",
+          "transcript_exon": "2",
+          "transcript_strand": "-",
+          "tumor_seq_allele2": "G",
+          "transcript_position": "222",
+          "annotation_transcript": "ENST00000451590.1",
+          "tumor_sample_barcode": "NIBMG-E544-GB",
+          "variant_id": 3575.0,
+          "gene": "HRAS"
+        },
+        {
+          "remarks": "-",
+          "end": "7573976",
+          "chrom": "chr17",
+          "start": "7573976",
+          "disease": "OSCC_GB",
+          "ncbi_build": "37",
+          "dbsnp_rs": "rs141402957",
+          "ref_allele": "T",
+          "reference": "NIBMG",
+          "entrez_gene_id": 7157.0,
+          "cDNA_change": "c.1051A>T",
+          "variant_type": "SNP",
+          "codon_change": "c.(1051-1053)Aag>Tag",
+          "genome_change": "g.chr17:7573976T>A",
+          "variant_class": "Nonsense_Mutation",
+          "protein_change": "p.K351*",
+          "reference_url": "https://www.nibmg.ac.in/",
+          "transcript_exon": "10",
+          "transcript_strand": "-",
+          "tumor_seq_allele2": "A",
+          "transcript_position": "1240",
+          "annotation_transcript": "ENST00000269305.4",
+          "tumor_sample_barcode": "NIBMG-K245-GB",
+          "variant_id": 8296.0,
+          "gene": "TP53"
+        },
+        {
+          "remarks": "-",
+          "end": "7574003",
+          "chrom": "chr17",
+          "start": "7574003",
+          "disease": "OSCC_GB",
+          "ncbi_build": "37",
+          "dbsnp_rs": "-",
+          "ref_allele": "G",
+          "reference": "NIBMG",
+          "entrez_gene_id": 7157.0,
+          "cDNA_change": "c.1024C>T",
+          "variant_type": "SNP",
+          "codon_change": "c.(1024-1026)Cga>Tga",
+          "genome_change": "g.chr17:7574003G>A",
+          "variant_class": "Nonsense_Mutation",
+          "protein_change": "p.R342*",
+          "reference_url": "https://www.nibmg.ac.in/",
+          "transcript_exon": "10",
+          "transcript_strand": "-",
+          "tumor_seq_allele2": "A",
+          "transcript_position": "1213",
+          "annotation_transcript": "ENST00000269305.4",
+          "tumor_sample_barcode": "NIBMG-P214-GB",
+          "variant_id": 8275.0,
+          "gene": "TP53"
+        },
+        {
+          "remarks": "-",
+          "end": "7574003",
+          "chrom": "chr17",
+          "start": "7574003",
+          "disease": "OSCC_GB",
+          "ncbi_build": "37",
+          "dbsnp_rs": "-",
+          "ref_allele": "G",
+          "reference": "NIBMG",
+          "entrez_gene_id": 7157.0,
+          "cDNA_change": "c.1024C>T",
+          "variant_type": "SNP",
+          "codon_change": "c.(1024-1026)Cga>Tga",
+          "genome_change": "g.chr17:7574003G>A",
+          "variant_class": "Nonsense_Mutation",
+          "protein_change": "p.R342*",
+          "reference_url": "https://www.nibmg.ac.in/",
+          "transcript_exon": "10",
+          "transcript_strand": "-",
+          "tumor_seq_allele2": "A",
+          "transcript_position": "1213",
+          "annotation_transcript": "ENST00000269305.4",
+          "tumor_sample_barcode": "NIBMG-K245-GB",
+          "variant_id": 8276.0,
+          "gene": "TP53"
+        },
+        {
+          "remarks": "-",
+          "end": "7574003",
+          "chrom": "chr17",
+          "start": "7574003",
+          "disease": "OSCC_GB",
+          "ncbi_build": "37",
+          "dbsnp_rs": "-",
+          "ref_allele": "G",
+          "reference": "NIBMG",
+          "entrez_gene_id": 7157.0,
+          "cDNA_change": "c.1024C>T",
+          "variant_type": "SNP",
+          "codon_change": "c.(1024-1026)Cga>Tga",
+          "genome_change": "g.chr17:7574003G>A",
+          "variant_class": "Nonsense_Mutation",
+          "protein_change": "p.R342*",
+          "reference_url": "https://www.nibmg.ac.in/",
+          "transcript_exon": "10",
+          "transcript_strand": "-",
+          "tumor_seq_allele2": "A",
+          "transcript_position": "1213",
+          "annotation_transcript": "ENST00000269305.4",
+          "tumor_sample_barcode": "NIBMG-A369-GB",
+          "variant_id": 8302.0,
+          "gene": "TP53"
+        },
+        {
+          "remarks": "-",
+          "end": "7574003",
+          "chrom": "chr17",
+          "start": "7574003",
+          "disease": "OSCC_GB",
+          "ncbi_build": "37",
+          "dbsnp_rs": "-",
+          "ref_allele": "G",
+          "reference": "NIBMG",
+          "entrez_gene_id": 7157.0,
+          "cDNA_change": "c.1024C>T",
+          "variant_type": "SNP",
+          "codon_change": "c.(1024-1026)Cga>Tga",
+          "genome_change": "g.chr17:7574003G>A",
+          "variant_class": "Nonsense_Mutation",
+          "protein_change": "p.R342*",
+          "reference_url": "https://www.nibmg.ac.in/",
+          "transcript_exon": "10",
+          "transcript_strand": "-",
+          "tumor_seq_allele2": "A",
+          "transcript_position": "1213",
+          "annotation_transcript": "ENST00000269305.4",
+          "tumor_sample_barcode": "NIBMG-D489-GB",
+          "variant_id": 8303.0,
+          "gene": "TP53"
+        }
+      ]
+    },
+    "headers": {
+      "Server": "nginx/1.28.1",
+      "Date": "Thu, 29 Jan 2026 08:58:13 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Vary": "Accept-Encoding",
+      "Content-Encoding": "gzip"
+    },
+    "elapsed_ms": 8.939
+  },
+  "pass": true,
+  "notes": ""
+}
