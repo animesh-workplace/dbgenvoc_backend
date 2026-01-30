@@ -1,0 +1,30 @@
+{
+  "url": "http://10.10.6.80/dbgenvoc/api/v2/nibmg_exome_somatic_variants/search",
+  "name": "invalid_sort_column",
+  "timestamp": "20260129_142813",
+  "request": {
+    "sort_by": "nonexistent_column",
+    "page": 1,
+    "page_size": 5
+  },
+  "expected_checks": [
+    "Status code should be 400 or 500",
+    "Should return error message about invalid sort column"
+  ],
+  "actual_response": {
+    "status_code": 400,
+    "response_body": {
+      "error": "{\"detail\":\"Column 'nonexistent_column' does not exist\"}"
+    },
+    "headers": {
+      "Server": "nginx/1.28.1",
+      "Date": "Thu, 29 Jan 2026 08:58:13 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "55",
+      "Connection": "keep-alive"
+    },
+    "elapsed_ms": 2.319
+  },
+  "pass": false,
+  "notes": ""
+}
