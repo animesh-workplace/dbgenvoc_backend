@@ -1,0 +1,39 @@
+{
+  "url": "http://10.10.6.80/dbgenvoc/api/v2/nibmg_exome_somatic_variants/search",
+  "name": "page_beyond_results",
+  "timestamp": "20260129_142813",
+  "request": {
+    "page": 1000,
+    "page_size": 60
+  },
+  "expected_checks": [
+    "Status code should be 200",
+    "results array should be empty (or have few results)",
+    "total_results should be less than page * page_size"
+  ],
+  "actual_response": {
+    "status_code": 200,
+    "response_body": {
+      "page": 1000,
+      "page_size": 60,
+      "table_name": "nibmg_exome_somatic_variants",
+      "sort_order": "asc",
+      "total_results": 9336,
+      "sort_by": null,
+      "search_term": null,
+      "results": []
+    },
+    "headers": {
+      "Server": "nginx/1.28.1",
+      "Date": "Thu, 29 Jan 2026 08:58:13 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Vary": "Accept-Encoding",
+      "Content-Encoding": "gzip"
+    },
+    "elapsed_ms": 12.836
+  },
+  "pass": true,
+  "notes": ""
+}
