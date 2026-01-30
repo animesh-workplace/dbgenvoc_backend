@@ -262,6 +262,7 @@ async def generic_aggregate(
         else:
             # === SCALAR AGGREGATION ===
             col_attr = getattr(model_class, request.column)
+            group_totals_map = None
 
             if request.aggregation_type == AggregationType.percentage:
                 numerator = query.with_entities(func.count(col_attr)).scalar() or 0
