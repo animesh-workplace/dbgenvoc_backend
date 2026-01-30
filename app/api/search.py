@@ -19,39 +19,31 @@ from app.core import (
 
 
 class SearchRequest(BaseModel):
-    # --- Precise Filters  ---
     filters: Optional[ComplexFilter] = Field(
         None,
         description="Structured filters with AND/OR logic (e.g., gene IN [TP53, BRCA1])",
     )
-
-    # --- Genomic Position Filters  ---
     genomic_filter: Optional[GenomicPositionFilter] = Field(
         None,
         description="Filter by genomic positions/ranges or pathway",
     )
-
-    # --- Text Search ---
     term: Optional[str] = Field(
         None, description="Single search term for global text search (partial match)"
     )
-
     search_columns: Optional[List[str]] = Field(
         None, description="Specific columns to text-search (defaults to all searchable)"
     )
-
-    # --- Pagination & Sorting ---
     page: int = Field(1, ge=1, description="Page number")
     page_size: int = Field(10, ge=1, le=1000, description="Results per page")
     sort_by: Optional[str] = Field(None, description="Column to sort by")
     sort_order: SortOrder = Field(SortOrder.ASC, description="Sort direction")
 
-    @field_validator("sort_by")
+    @field_validator("sort_by", "term")
     @classmethod
-    def validate_sort_by(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None:
+    def _strip_and_validate(cls, v: Optional[str], info) -> Optional[str]:
+        if v is not None and isinstance(v, str):
             v = v.strip()
-            if not v:
+            if not v and info.field_name == "term":
                 return None
         return v
 
@@ -68,27 +60,6 @@ class SearchResponse(BaseModel):
 
 
 # ==========================================
-# INTERNAL HELPERS
-# ==========================================
-
-
-def apply_sorting(query, model_class, sort_by: Optional[str], sort_order: SortOrder):
-    """Apply sorting to query"""
-    if not sort_by:
-        return query
-
-    if not hasattr(model_class, sort_by):
-        raise HTTPException(
-            status_code=400, detail=f"Column '{sort_by}' does not exist"
-        )
-
-    col_attr = getattr(model_class, sort_by)
-    if sort_order == SortOrder.DESC:
-        return query.order_by(desc(col_attr))
-    return query.order_by(asc(col_attr))
-
-
-# ==========================================
 # MAIN SEARCH API
 # ==========================================
 
@@ -96,74 +67,56 @@ def apply_sorting(query, model_class, sort_by: Optional[str], sort_order: SortOr
 async def generic_search(table_name: str, request: SearchRequest, db) -> SearchResponse:
     """
     Enhanced Combined Search API with unified genomic position filtering.
-
-    Query execution order:
-    1. FROM table_name
-    2. WHERE filters (structured filters)
-    3. WHERE genomic_filter (unified positions/ranges + pathway)
-    4. WHERE term (text search)
-    5. ORDER BY sort_by
-    6. LIMIT/OFFSET (pagination)
-
-    Genomic Filtering Features:
-    - Mix ranges and exact positions in single query
-    - Multi-chromosome queries
-    - Flexible chromosome naming ('chr17' or '17')
-    - Overlap detection (if 'end' column exists)
-    - OR logic (match ANY position/range)
-    - Optional pathway filtering
     """
     try:
         model_class = get_model_class(table_name)
         query = db.query(model_class)
 
-        # ---------------------------------------------------------
-        # 1. Apply Structured Filters (Context)
-        # ---------------------------------------------------------
-        query = apply_filters(query, model_class, request.filters)
+        # Apply structured filters
+        if request.filters:
+            query = apply_filters(query, model_class, request.filters)
 
-        # ---------------------------------------------------------
-        # 2. Apply Genomic Position Filters (Unified)
-        # ---------------------------------------------------------
-        query = _apply_genomic_position_filter(
-            query, model_class, request.genomic_filter
-        )
+        # Apply genomic position filters
+        if request.genomic_filter:
+            query = _apply_genomic_position_filter(
+                query, model_class, request.genomic_filter
+            )
 
-        # ---------------------------------------------------------
-        # 3. Apply Text Search (Refinement)
-        # ---------------------------------------------------------
-        if request.term and request.term.strip():
-            term = request.term.strip()
-
-            # Determine target columns
+        # Apply text search
+        if request.term:
+            # Determine and validate search columns
             if request.search_columns:
-                columns_to_search = validate_columns(
-                    model_class, request.search_columns
-                )
+                search_columns = validate_columns(model_class, request.search_columns)
             else:
-                columns_to_search = [
+                search_columns = [
                     col
                     for col in get_searchable_columns(table_name)
                     if hasattr(model_class, col)
                 ]
 
-            # Build Search Logic: Partial match (ilike) in ANY column
-            conditions = []
-            for col in columns_to_search:
-                attr = getattr(model_class, col)
-                conditions.append(attr.ilike(f"%{term}%"))
-
-            if conditions:
+            if search_columns:
+                # Build search conditions using list comprehension
+                conditions = [
+                    getattr(model_class, col).ilike(f"%{request.term}%")
+                    for col in search_columns
+                ]
                 query = query.filter(or_(*conditions))
 
-        # ---------------------------------------------------------
-        # 4. Sorting
-        # ---------------------------------------------------------
-        query = apply_sorting(query, model_class, request.sort_by, request.sort_order)
+        # Apply sorting
+        if request.sort_by:
+            if not hasattr(model_class, request.sort_by):
+                raise HTTPException(
+                    status_code=400, detail=f"Column '{request.sort_by}' does not exist"
+                )
 
-        # ---------------------------------------------------------
-        # 5. Pagination & Execution
-        # ---------------------------------------------------------
+            col_attr = getattr(model_class, request.sort_by)
+            query = query.order_by(
+                desc(col_attr)
+                if request.sort_order == SortOrder.DESC
+                else asc(col_attr)
+            )
+
+        # Pagination and execution
         total_results = query.count()
         offset = (request.page - 1) * request.page_size
         results = query.offset(offset).limit(request.page_size).all()
@@ -179,7 +132,7 @@ async def generic_search(table_name: str, request: SearchRequest, db) -> SearchR
             results=[row_to_dict(row) for row in results],
         )
 
-    except HTTPException as he:
-        raise he
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
