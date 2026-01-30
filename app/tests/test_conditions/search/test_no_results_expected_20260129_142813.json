@@ -1,0 +1,40 @@
+{
+  "url": "http://10.10.6.80/dbgenvoc/api/v2/nibmg_exome_somatic_variants/search",
+  "name": "no_results_expected",
+  "timestamp": "20260129_142813",
+  "request": {
+    "term": "XYZ123nonexistent",
+    "page": 1,
+    "page_size": 5
+  },
+  "expected_checks": [
+    "Status code should be 200",
+    "total_results should be 0",
+    "results array should be empty"
+  ],
+  "actual_response": {
+    "status_code": 200,
+    "response_body": {
+      "page": 1,
+      "page_size": 5,
+      "table_name": "nibmg_exome_somatic_variants",
+      "sort_order": "asc",
+      "total_results": 0,
+      "sort_by": null,
+      "search_term": "XYZ123nonexistent",
+      "results": []
+    },
+    "headers": {
+      "Server": "nginx/1.28.1",
+      "Date": "Thu, 29 Jan 2026 08:58:13 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Vary": "Accept-Encoding",
+      "Content-Encoding": "gzip"
+    },
+    "elapsed_ms": 143.626
+  },
+  "pass": true,
+  "notes": ""
+}
