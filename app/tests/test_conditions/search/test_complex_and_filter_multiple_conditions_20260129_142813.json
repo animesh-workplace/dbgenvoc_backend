@@ -1,0 +1,97 @@
+{
+  "url": "http://10.10.6.80/dbgenvoc/api/v2/nibmg_exome_somatic_variants/search",
+  "name": "complex_and_filter_multiple_conditions",
+  "timestamp": "20260129_142813",
+  "request": {
+    "page": 1,
+    "page_size": 10,
+    "filters": {
+      "logic": "AND",
+      "conditions": [
+        {
+          "logic": "OR",
+          "conditions": [
+            {
+              "column": "variant_class",
+              "operator": "eq",
+              "value": "Missense_Mutation"
+            },
+            {
+              "column": "variant_class",
+              "operator": "eq",
+              "value": "Nonsense_Mutation"
+            },
+            {
+              "column": "variant_class",
+              "operator": "eq",
+              "value": "Frame_Shift_Ins"
+            }
+          ]
+        },
+        {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "gene",
+              "operator": "in",
+              "value": [
+                "TP53",
+                "KRAS",
+                "BRAF",
+                "EGFR"
+              ]
+            },
+            {
+              "column": "tumor_sample_barcode",
+              "operator": "like",
+              "value": "TCGA"
+            }
+          ]
+        },
+        {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "ncbi_build",
+              "operator": "eq",
+              "value": "37"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "expected_checks": [
+    "Status code should be 200",
+    "All results should have variant_class in ['Missense_Mutation', 'Nonsense_Mutation', 'Frame_Shift_Ins']",
+    "All results should have gene in ['TP53', 'KRAS', 'BRAF', 'EGFR']",
+    "All results should have tumor_sample_barcode containing 'TCGA'",
+    "All results should have ncbi_build = '37'",
+    "Results should be limited to 10 items"
+  ],
+  "actual_response": {
+    "status_code": 200,
+    "response_body": {
+      "page": 1,
+      "page_size": 10,
+      "table_name": "nibmg_exome_somatic_variants",
+      "sort_order": "asc",
+      "total_results": 0,
+      "sort_by": null,
+      "search_term": null,
+      "results": []
+    },
+    "headers": {
+      "Server": "nginx/1.28.1",
+      "Date": "Thu, 29 Jan 2026 08:58:13 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Vary": "Accept-Encoding",
+      "Content-Encoding": "gzip"
+    },
+    "elapsed_ms": 6.985
+  },
+  "pass": true,
+  "notes": ""
+}
