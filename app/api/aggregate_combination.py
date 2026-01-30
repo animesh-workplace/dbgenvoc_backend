@@ -1,9 +1,13 @@
-from fastapi import HTTPException
 from sqlalchemy import func
+from fastapi import HTTPException
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field, field_validator
 from app.core import get_model_class, apply_filters, validate_columns
-from app.api.utils import _apply_genomic_position_filter, _build_having_filter
+from app.api.utils import (
+    _AGGREGATION_FUNCS,
+    _build_having_filter,
+    _apply_genomic_position_filter,
+)
 from app.api.schema import (
     SortOrder,
     HavingClause,
@@ -22,41 +26,32 @@ class ComputedField(BaseModel):
     name: str
     type: ComputedFieldType = ComputedFieldType.concat
     columns: List[str]
-    separator: str
+    separator: str = Field("")
 
     @field_validator("name")
     @classmethod
-    def validate_name(cls, v):
+    def _validate_name(cls, v):
         if not v.isidentifier():
             raise ValueError("Computed field name must be a valid identifier")
         return v
 
 
 class ConcatenatedAggregationRequest(BaseModel):
-    """Request for concatenated/combination aggregation."""
-
     aggregate_column: str = Field(
         ..., description="Column to aggregate (e.g., 'variant_id' for counting)"
     )
-
     combination_columns: List[str] = Field(
         ..., min_length=1, description="Columns to combine/concatenate for grouping"
     )
-
     aggregation_type: AggregationType = Field(
         AggregationType.count, description="Type of aggregation operation"
     )
-
-    # --- Filters ---
     filters: Optional[ComplexFilter] = Field(
         None, description="Complex filters with AND/OR logic (applied before GROUP BY)"
     )
-
     genomic_filter: Optional[GenomicPositionFilter] = Field(
         None, description="Genomic position/pathway filters (applied before GROUP BY)"
     )
-
-    # --- Percentage Options ---
     percentage_by: Optional[List[str]] = Field(
         None,
         description=(
@@ -65,66 +60,55 @@ class ConcatenatedAggregationRequest(BaseModel):
             "If None, calculates global percentage."
         ),
     )
-
-    # --- Post-Aggregation Filters ---
     having: Optional[HavingClause] = Field(
         None,
         description="HAVING clause to filter aggregated results (applied after GROUP BY)",
     )
-
-    # --- Sorting ---
     order_by: Optional[Union[str, List[str]]] = Field(
         None,
         description=(
             "Column(s) to order by. "
             "Use 'aggregated_value' to sort by aggregation result, "
-            "or any column from combination_columns. "
-            "Can be string or list of strings."
+            "or any column from combination_columns."
         ),
     )
-
     order_direction: SortOrder = Field(
         SortOrder.DESC,
         description="Sort direction (applies to all order_by columns)",
     )
-
-    # --- Pagination ---
     limit: Optional[int] = Field(None, ge=1, description="Limit number of results")
-
-    # --- Computed Fields ---
     computed_fields: Optional[List[ComputedField]] = Field(
         None,
         description="Fields to compute from combination_columns (e.g., concatenation)",
     )
 
-    @field_validator("percentage_by")
+    @field_validator("percentage_by", "order_by")
     @classmethod
-    def validate_percentage_by(cls, v, info):
-        if v:
-            combo = info.data.get("combination_columns")
-            if not combo or not set(v).issubset(set(combo)):
-                raise ValueError("percentage_by must be subset of combination_columns")
-        return v
-
-    @field_validator("order_by")
-    @classmethod
-    def validate_order_by(cls, v, info):
+    def _validate_subset_of_combo(cls, v, info):
         if v:
             combo = info.data.get("combination_columns", [])
-            order_cols = [v] if isinstance(v, str) else v
 
-            for col in order_cols:
-                if col != "aggregated_value" and col not in combo:
+            if info.field_name == "percentage_by":
+                if not set(v).issubset(combo):
                     raise ValueError(
-                        f"order_by column '{col}' must be 'aggregated_value' "
-                        f"or one of combination_columns: {combo}"
+                        "percentage_by must be subset of combination_columns"
+                    )
+
+            elif info.field_name == "order_by":
+                order_cols = [v] if isinstance(v, str) else v
+                invalid = [
+                    col
+                    for col in order_cols
+                    if col != "aggregated_value" and col not in combo
+                ]
+                if invalid:
+                    raise ValueError(
+                        f"order_by columns {invalid} must be 'aggregated_value' or in combination_columns"
                     )
         return v
 
 
 class ConcatenatedAggregationResponse(BaseModel):
-    """Response for concatenated aggregation."""
-
     table_name: str
     total_records: int
     limit: Optional[int]
@@ -153,47 +137,31 @@ def _apply_ordering(
     agg_expr,
     combination_columns: List[str],
 ):
-    """Apply ordering to the query (matching aggregate.py style)."""
+    """Apply ordering to the query."""
+    if not order_by:
+        return query
 
     order_clauses = []
+    order_by_list = [order_by] if isinstance(order_by, str) else order_by
 
-    def add_order_clause(column_expr):
-        if order_direction == SortOrder.DESC:
-            return column_expr.desc()
+    for order_col in order_by_list:
+        if order_col == "aggregated_value":
+            column_expr = agg_expr
+        elif order_col in combination_columns:
+            idx = combination_columns.index(order_col)
+            column_expr = group_attrs[idx]
         else:
-            return column_expr.asc()
+            raise ValueError(
+                f"Cannot order by '{order_col}'. Must be 'aggregated_value' "
+                f"or one of combination_columns: {combination_columns}"
+            )
+        order_clauses.append(
+            column_expr.desc()
+            if order_direction == SortOrder.DESC
+            else column_expr.asc()
+        )
 
-    if order_by:
-        if isinstance(order_by, str):
-            # Single column
-            if order_by == "aggregated_value":
-                order_clauses.append(add_order_clause(agg_expr))
-            elif order_by in combination_columns:
-                idx = combination_columns.index(order_by)
-                order_clauses.append(add_order_clause(group_attrs[idx]))
-            else:
-                raise ValueError(
-                    f"Cannot order by '{order_by}'. Must be 'aggregated_value' "
-                    f"or one of combination_columns: {combination_columns}"
-                )
-        else:
-            # Multiple columns
-            for order_col in order_by:
-                if order_col == "aggregated_value":
-                    order_clauses.append(add_order_clause(agg_expr))
-                elif order_col in combination_columns:
-                    idx = combination_columns.index(order_col)
-                    order_clauses.append(add_order_clause(group_attrs[idx]))
-                else:
-                    raise ValueError(
-                        f"Cannot order by '{order_col}'. Must be 'aggregated_value' "
-                        f"or one of combination_columns: {combination_columns}"
-                    )
-
-    if order_clauses:
-        query = query.order_by(*order_clauses)
-
-    return query
+    return query.order_by(*order_clauses)
 
 
 def _apply_computed_fields(rows, computed_fields):
@@ -207,7 +175,6 @@ def _apply_computed_fields(rows, computed_fields):
                 row[field.name] = field.separator.join(
                     "" if row.get(c) is None else str(row.get(c)) for c in field.columns
                 )
-
     return rows
 
 
@@ -222,45 +189,38 @@ async def generic_concatenated_aggregate(
     table_name: str,
 ) -> ConcatenatedAggregationResponse:
     """
-    Enhanced concatenated aggregation with:
-    - Partitioned percentage calculation
-    - Multi-column ordering
-    - HAVING clause support
-    - Maintained combination logic
+    Enhanced concatenated aggregation with partitioned percentage calculation.
     """
     try:
-        # 1. Validation
+        # 1. Validation (combined)
         model = get_model_class(table_name)
-        validate_columns(model, request.combination_columns)
-        validate_columns(model, [request.aggregate_column])
+        columns_to_validate = set(
+            request.combination_columns + [request.aggregate_column]
+        )
         if request.percentage_by:
-            validate_columns(model, request.percentage_by)
+            columns_to_validate.update(request.percentage_by)
+        validate_columns(model, list(columns_to_validate))
 
-        # Get column attributes
+        # 2. Get column attributes
         agg_col = getattr(model, request.aggregate_column)
         group_attrs = [getattr(model, c) for c in request.combination_columns]
 
-        # 2. Build base query with filters
+        # 3. Build base query with filters
         query = db.query(model)
-        query = apply_filters(query, model, request.filters)
-        query = _apply_genomic_position_filter(query, model, request.genomic_filter)
+        if request.filters:
+            query = apply_filters(query, model, request.filters)
+        if request.genomic_filter:
+            query = _apply_genomic_position_filter(query, model, request.genomic_filter)
 
-        # 3. Capture total records (before grouping)
         total_records = query.count()
 
         # 4. Build aggregation expression
         extra_selects = []
         group_totals_map = {}
+        combination_cols = request.combination_columns
 
-        if request.aggregation_type == AggregationType.count:
-            agg_expr = func.count(agg_col)
-
-        elif request.aggregation_type == AggregationType.distinct_count:
-            agg_expr = func.count(func.distinct(agg_col))
-
-        elif request.aggregation_type == AggregationType.percentage:
+        if request.aggregation_type == AggregationType.percentage:
             if request.percentage_by:
-                # PARTITIONED PERCENTAGE (like aggregate.py)
                 partition_attrs = [getattr(model, c) for c in request.percentage_by]
                 denominator = func.sum(func.count(agg_col)).over(
                     partition_by=partition_attrs
@@ -268,101 +228,78 @@ async def generic_concatenated_aggregate(
                 agg_expr = func.count(agg_col) * 100.0 / denominator
                 extra_selects.append(denominator.label("group_total"))
             else:
-                # GLOBAL PERCENTAGE
-                agg_expr = (
-                    func.count(agg_col) * 100.0 / total_records if total_records else 1
-                )
-
-        elif request.aggregation_type == AggregationType.sum:
-            agg_expr = func.sum(agg_col)
-        elif request.aggregation_type == AggregationType.avg:
-            agg_expr = func.avg(agg_col)
-        elif request.aggregation_type == AggregationType.min:
-            agg_expr = func.min(agg_col)
-        elif request.aggregation_type == AggregationType.max:
-            agg_expr = func.max(agg_col)
+                agg_expr = func.count(agg_col) * 100.0 / (total_records or 1)
         else:
-            raise HTTPException(400, detail="Unsupported aggregation type")
+            agg_expr = _AGGREGATION_FUNCS[request.aggregation_type](agg_col)
 
-        # 5. Build grouped query
+        # 5. Build and execute grouped query
         grouped_query = query.with_entities(
             *group_attrs, agg_expr.label("aggregated_value"), *extra_selects
         ).group_by(*group_attrs)
 
-        # 6. Count groups before HAVING
+        # More efficient groups_before_having calculation
         groups_before_having = (
-            db.query(func.count()).select_from(grouped_query.subquery()).scalar() or 0
+            query.with_entities(*group_attrs).group_by(*group_attrs).count()
         )
 
-        # 7. Apply HAVING clause
         if request.having:
-            having_filter = _build_having_filter(request.having, agg_expr)
-            grouped_query = grouped_query.having(having_filter)
+            grouped_query = grouped_query.having(
+                _build_having_filter(request.having, agg_expr)
+            )
 
-        # 8. Apply ordering
-        grouped_query = _apply_ordering(
-            grouped_query,
-            request.order_by,
-            request.order_direction,
-            group_attrs,
-            agg_expr,
-            request.combination_columns,
-        )
+        if request.order_by:
+            grouped_query = _apply_ordering(
+                grouped_query,
+                request.order_by,
+                request.order_direction,
+                group_attrs,
+                agg_expr,
+                combination_cols,
+            )
 
-        # 9. Apply LIMIT
         if request.limit:
             grouped_query = grouped_query.limit(request.limit)
 
-        # 10. Execute query
         rows = grouped_query.all()
         groups_after_having = len(rows)
 
-        # 11. Format results
+        # 6. Format results
         results = []
-        pct_indices = None
-
-        if request.percentage_by:
-            pct_indices = [
-                request.combination_columns.index(c) for c in request.percentage_by
-            ]
+        pct_indices = (
+            [combination_cols.index(c) for c in request.percentage_by]
+            if request.percentage_by
+            else []
+        )
 
         for row in rows:
-            item = {}
-
-            # Add combination columns
-            for i, col in enumerate(request.combination_columns):
-                item[col] = row[i]
+            # Build result dict with combination columns
+            item = {combination_cols[i]: row[i] for i in range(len(combination_cols))}
 
             # Add aggregated value
-            val_index = len(request.combination_columns)
-            val = row[val_index]
-
-            # Round percentage values
+            val = row[len(combination_cols)]
             if (
                 request.aggregation_type == AggregationType.percentage
                 and val is not None
             ):
                 val = round(float(val), 2)
-
             item["aggregated_value"] = val
 
-            # Store group totals for partitioned percentages
+            # Handle percentage totals
             if request.aggregation_type == AggregationType.percentage:
                 if request.percentage_by:
-                    # Extract partition key
-                    total_val = row[val_index + 1]
-                    key_parts = [str(row[idx]) for idx in pct_indices]
-                    key = ".".join(key_parts)
+                    total_val = row[len(combination_cols) + 1]
+                    key = ".".join(str(row[idx]) for idx in pct_indices)
                     group_totals_map[key] = int(total_val) if total_val else 0
                 else:
                     group_totals_map["global"] = total_records
 
             results.append(item)
 
-        # 12. Apply computed fields
-        results = _apply_computed_fields(results, request.computed_fields)
+        # 7. Apply computed fields
+        if request.computed_fields:
+            results = _apply_computed_fields(results, request.computed_fields)
 
-        # 13. Return response
+        # 8. Return response
         return ConcatenatedAggregationResponse(
             result=results,
             limit=request.limit,
