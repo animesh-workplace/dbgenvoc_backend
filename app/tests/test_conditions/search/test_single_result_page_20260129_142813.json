@@ -1,0 +1,67 @@
+{
+  "url": "http://10.10.6.80/dbgenvoc/api/v2/nibmg_exome_somatic_variants/search",
+  "name": "single_result_page",
+  "timestamp": "20260129_142813",
+  "request": {
+    "page": 1,
+    "page_size": 1
+  },
+  "expected_checks": [
+    "Status code should be 200",
+    "results array should have exactly 1 item",
+    "page_size should be 1"
+  ],
+  "actual_response": {
+    "status_code": 200,
+    "response_body": {
+      "page": 1,
+      "page_size": 1,
+      "table_name": "nibmg_exome_somatic_variants",
+      "sort_order": "asc",
+      "total_results": 9336,
+      "sort_by": null,
+      "search_term": null,
+      "results": [
+        {
+          "remarks": "-",
+          "end": "9261952",
+          "chrom": "chr12",
+          "start": "9261952",
+          "disease": "OSCC_GB",
+          "ncbi_build": "37",
+          "dbsnp_rs": "-",
+          "ref_allele": "G",
+          "reference": "NIBMG",
+          "entrez_gene_id": 2.0,
+          "cDNA_change": "c.723C>G",
+          "variant_type": "SNP",
+          "codon_change": "c.(721-723)atC>atG",
+          "genome_change": "g.chr12:9261952G>C",
+          "variant_class": "Missense_Mutation",
+          "protein_change": "p.I241M",
+          "reference_url": "https://www.nibmg.ac.in/",
+          "transcript_exon": "7",
+          "transcript_strand": "-",
+          "tumor_seq_allele2": "C",
+          "transcript_position": "1030",
+          "annotation_transcript": "ENST00000318602.7",
+          "tumor_sample_barcode": "NIBMG-Y835-GB",
+          "variant_id": 1.0,
+          "gene": "A2M"
+        }
+      ]
+    },
+    "headers": {
+      "Server": "nginx/1.28.1",
+      "Date": "Thu, 29 Jan 2026 08:58:13 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Vary": "Accept-Encoding",
+      "Content-Encoding": "gzip"
+    },
+    "elapsed_ms": 3.424
+  },
+  "pass": true,
+  "notes": ""
+}
