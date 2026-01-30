@@ -1,0 +1,33 @@
+{
+  "url": "http://10.10.6.80/dbgenvoc/api/v2/nibmg_exome_somatic_variants/search",
+  "name": "invalid_search_column",
+  "timestamp": "20260129_142813",
+  "request": {
+    "term": "test",
+    "search_columns": [
+      "nonexistent_column"
+    ],
+    "page": 1,
+    "page_size": 5
+  },
+  "expected_checks": [
+    "Status code should be 400 or 500",
+    "Should return error message about invalid column"
+  ],
+  "actual_response": {
+    "status_code": 400,
+    "response_body": {
+      "error": "{\"detail\":\"Invalid columns: ['nonexistent_column']. Available columns: ['remarks', 'end', 'chrom', 'start', 'disease', 'ncbi_build', 'dbsnp_rs', 'ref_allele', 'reference', 'entrez_gene_id', 'cDNA_change', 'variant_type', 'codon_change', 'genome_change', 'variant_class', 'protein_change', 'reference_url', 'transcript_exon', 'transcript_strand', 'tumor_seq_allele2', 'transcript_position', 'annotation_transcript', 'tumor_sample_barcode', 'variant_id', 'gene']\"}"
+    },
+    "headers": {
+      "Server": "nginx/1.28.1",
+      "Date": "Thu, 29 Jan 2026 08:58:13 GMT",
+      "Content-Type": "application/json",
+      "Content-Length": "462",
+      "Connection": "keep-alive"
+    },
+    "elapsed_ms": 1.869
+  },
+  "pass": false,
+  "notes": ""
+}
