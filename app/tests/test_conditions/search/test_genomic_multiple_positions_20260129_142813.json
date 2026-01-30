@@ -1,0 +1,51 @@
+{
+  "url": "http://10.10.6.80/dbgenvoc/api/v2/nibmg_exome_somatic_variants/search",
+  "name": "genomic_multiple_positions",
+  "timestamp": "20260129_142813",
+  "request": {
+    "genomic_filter": {
+      "positions": [
+        {
+          "chromosome": "chr17",
+          "start": 7577058
+        },
+        {
+          "chromosome": "chr12",
+          "start": 53292675
+        }
+      ]
+    },
+    "page": 1,
+    "page_size": 10
+  },
+  "expected_checks": [
+    "Status code should be 200",
+    "Results should be from either position",
+    "Should include TP53 and KRT8 variants"
+  ],
+  "actual_response": {
+    "status_code": 200,
+    "response_body": {
+      "page": 1,
+      "page_size": 10,
+      "table_name": "nibmg_exome_somatic_variants",
+      "sort_order": "asc",
+      "total_results": 0,
+      "sort_by": null,
+      "search_term": null,
+      "results": []
+    },
+    "headers": {
+      "Server": "nginx/1.28.1",
+      "Date": "Thu, 29 Jan 2026 08:58:13 GMT",
+      "Content-Type": "application/json",
+      "Transfer-Encoding": "chunked",
+      "Connection": "keep-alive",
+      "Vary": "Accept-Encoding",
+      "Content-Encoding": "gzip"
+    },
+    "elapsed_ms": 8.354000000000001
+  },
+  "pass": true,
+  "notes": ""
+}
