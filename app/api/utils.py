@@ -1,8 +1,22 @@
 from typing import Optional
-from sqlalchemy import and_, or_
 from fastapi import HTTPException
+from sqlalchemy import func, and_, or_
 from app.abstract import Genelist, Pathway, pathway_gene_association
-from app.api.schema import HavingClause, HavingCondition, GenomicPositionFilter
+from app.api.schema import (
+    HavingClause,
+    AggregationType,
+    HavingCondition,
+    GenomicPositionFilter,
+)
+
+_AGGREGATION_FUNCS = {
+    AggregationType.sum: func.sum,
+    AggregationType.avg: func.avg,
+    AggregationType.min: func.min,
+    AggregationType.max: func.max,
+    AggregationType.count: func.count,
+    AggregationType.distinct_count: lambda col: func.count(func.distinct(col)),
+}
 
 
 def _normalize_chromosome(chrom: str) -> str:
