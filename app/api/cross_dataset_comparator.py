@@ -281,35 +281,34 @@ def _get_dataset_mutations(
             query = apply_filters(query, model_class, config.filters)
 
         # Apply gene filter
-        if genes and hasattr(model_class, "hugo_symbol"):
-            query = query.filter(model_class.hugo_symbol.in_(genes))
+        if genes and hasattr(model_class, "gene"):
+            query = query.filter(model_class.gene.in_(genes))
 
         # Apply variant classification filter
-        if variant_classifications and hasattr(model_class, "variant_classification"):
-            query = query.filter(
-                model_class.variant_classification.in_(variant_classifications)
-            )
+        if variant_classifications and hasattr(model_class, "variant_class"):
+            query = query.filter(model_class.variant_class.in_(variant_classifications))
 
         # Get mutations
         mutations = query.all()
 
-        # Get total samples
+        # Get total samples from mutations (FIXED!)
         if hasattr(model_class, "tumor_sample_barcode"):
-            total_samples = (
-                db.query(func.count(distinct(model_class.tumor_sample_barcode)))
-                .filter(query.whereclause if hasattr(query, "whereclause") else True)
-                .scalar()
-                or 0
-            )
+            # Count unique samples from already-fetched mutations
+            unique_samples = set()
+            for m in mutations:
+                sample = getattr(m, "tumor_sample_barcode", None)
+                if sample:
+                    unique_samples.add(sample)
+            total_samples = len(unique_samples)
         else:
             total_samples = len(mutations)
 
         # Get unique genes
         unique_genes = set()
-        if hasattr(model_class, "hugo_symbol"):
+        if hasattr(model_class, "gene"):
             for m in mutations:
-                if m.hugo_symbol:
-                    unique_genes.add(m.hugo_symbol)
+                if m.gene:
+                    unique_genes.add(m.gene)
 
         return mutations, total_samples, unique_genes
 
@@ -347,7 +346,7 @@ async def _compare_mutation_frequency(
         # Calculate gene-level statistics
         gene_counts = {}
         for mutation in mutations:
-            gene = getattr(mutation, "hugo_symbol", None)
+            gene = getattr(mutation, "gene", None)
             if gene:
                 gene_counts[gene] = gene_counts.get(gene, 0) + 1
 
@@ -475,15 +474,11 @@ async def _analyze_variant_overlap(
 
         for mutation in mutations:
             # Try to build unique variant key
-            chrom = getattr(mutation, "chrom", getattr(mutation, "chromosome", None))
-            pos = getattr(mutation, "start", getattr(mutation, "start_position", None))
+            chrom = getattr(mutation, "chrom", None)
+            pos = getattr(mutation, "start", None)
             ref = getattr(mutation, "reference_allele", None)
-            alt = getattr(
-                mutation,
-                "tumor_seq_allele2",
-                getattr(mutation, "alternate_allele", None),
-            )
-            gene = getattr(mutation, "hugo_symbol", None)
+            alt = getattr(mutation, "tumor_seq_allele2", None)
+            gene = getattr(mutation, "gene", None)
 
             if chrom and pos:
                 if ref and alt:
@@ -596,11 +591,7 @@ async def _compare_sample_statistics(
         # Calculate sample-level statistics
         sample_mutation_counts = {}
         for mutation in mutations:
-            sample = getattr(
-                mutation,
-                "tumor_sample_barcode",
-                getattr(mutation, "sample_id", "unknown"),
-            )
+            sample = getattr(mutation, "tumor_sample_barcode", None)
             sample_mutation_counts[sample] = sample_mutation_counts.get(sample, 0) + 1
 
         # Calculate statistics
