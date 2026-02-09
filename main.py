@@ -10,7 +10,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.interactions import interaction_search
 from app.api.search import SearchRequest, SearchResponse, generic_search
 from fastapi import FastAPI, Depends, Path, HTTPException, APIRouter, Query
-from langtrace_python_sdk.utils.with_root_span import with_langtrace_root_span
 from app.auth import verify_germline_token, TokenInfo, require_germline_access
 from app.api.structure import get_protein_structure, StructureResponse, StructureRequest
 from app.api.aggregate import generic_aggregate, AggregationRequest, AggregationResponse
@@ -37,16 +36,17 @@ from app.api.autocomplete import (
     unified_autocomplete,
 )
 
-# from app.schema import (
-#     OncoplotRequest,
-# )
-from app.api.oncoplot_data_retriever import (
-    oncoplot_data_retriever,
+from app.schema import (
     OncoplotRequest,
-    OncoplotResponse,
-    format_for_complexheatmap,
-    format_for_maftools,
 )
+
+# from app.api.oncoplot_data_retriever import (
+#     oncoplot_data_retriever,
+#     OncoplotRequest,
+#     OncoplotResponse,
+#     format_for_complexheatmap,
+#     format_for_maftools,
+# )
 from app.api.cross_dataset_comparator import (
     cross_dataset_comparator,
     CrossDatasetRequest,
@@ -165,13 +165,13 @@ async def fetch_structure(request: StructureRequest, db: Session = Depends(get_d
     return await get_protein_structure(request, db)
 
 
-@api_router.post(
-    "/precomputed_metrics_retriever", response_model=PrecomputedMetricsResponse
-)
-async def retrieve_metrics(
-    request: PrecomputedMetricsRequest, db: Session = Depends(get_db)
-):
-    return await precomputed_metrics_retriever(request, db)
+# @api_router.post(
+#     "/precomputed_metrics_retriever", response_model=PrecomputedMetricsResponse
+# )
+# async def retrieve_metrics(
+#     request: PrecomputedMetricsRequest, db: Session = Depends(get_db)
+# ):
+#     return await precomputed_metrics_retriever(request, db)
 
 
 @api_router.post(
@@ -188,25 +188,24 @@ async def variant_finder(
     return await proximity_variant_finder(request=request, table_name=table_name, db=db)
 
 
-@api_router.post(
-    "/{table_name}/oncoplot_data_retriever", response_model=OncoplotResponse
-)
-async def retrieve_oncoplot_data(
-    table_name: str, request: OncoplotRequest, db: Session = Depends(get_db)
-):
-    return await oncoplot_data_retriever(request, table_name, db)
+# @api_router.post(
+#     "/{table_name}/oncoplot_data_retriever", response_model=OncoplotResponse
+# )
+# async def retrieve_oncoplot_data(
+#     table_name: str, request: OncoplotRequest, db: Session = Depends(get_db)
+# ):
+#     return await oncoplot_data_retriever(request, table_name, db)
 
 
-@api_router.post("/cross_dataset_comparator", response_model=CrossDatasetResponse)
-async def cross_dataset_comparator_endpoint(
-    request: CrossDatasetRequest,
-    db: Session = Depends(get_db),
-):
-    return await cross_dataset_comparator(request, db)
+# @api_router.post("/cross_dataset_comparator", response_model=CrossDatasetResponse)
+# async def cross_dataset_comparator_endpoint(
+#     request: CrossDatasetRequest,
+#     db: Session = Depends(get_db),
+# ):
+#     return await cross_dataset_comparator(request, db)
 
 
 @api_router.get("/ask")
-@with_langtrace_root_span()
 async def ask_endpoint(
     query: str = Query(..., description="Natural language query"),
     stream: bool = Query(False, description="Enable streaming response"),
