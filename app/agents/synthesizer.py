@@ -1,5 +1,5 @@
 from agno.agent import Agent
-from app.session import ai_engine_pro as ai_engine
+from app.session import ai_shakti_lite_engine as ai_engine
 
 synthesizer_agent = Agent(
     markdown=True,
