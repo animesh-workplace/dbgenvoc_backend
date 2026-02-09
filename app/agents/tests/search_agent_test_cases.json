@@ -1,0 +1,532 @@
+[
+  {
+    "id": 1,
+    "category": "Single Structured Filter",
+    "orchestrator_query": "table_name: tcga_exome_somatic_variants | gene: TP53",
+    "expected_output": {
+      "table_name": "tcga_exome_somatic_variants",
+      "request_body": {
+        "filters": {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "gene",
+              "operator": "eq",
+              "value": "TP53"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": 2,
+    "category": "Multiple Values - IN Operator",
+    "orchestrator_query": "table_name: nibmg_exome_somatic_variants | gene: [TP53, BRCA1, BRCA2, EGFR]",
+    "expected_output": {
+      "table_name": "nibmg_exome_somatic_variants",
+      "request_body": {
+        "filters": {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "gene",
+              "operator": "in",
+              "value": ["TP53", "BRCA1", "BRCA2", "EGFR"]
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": 3,
+    "category": "Multiple Columns - AND Logic",
+    "orchestrator_query": "table_name: nibmg_exome_somatic_variants | gene: TP53 | variant_type: SNP | disease: OSCC",
+    "expected_output": {
+      "table_name": "nibmg_exome_somatic_variants",
+      "request_body": {
+        "filters": {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "gene",
+              "operator": "eq",
+              "value": "TP53"
+            },
+            {
+              "column": "variant_type",
+              "operator": "eq",
+              "value": "SNP"
+            },
+            {
+              "column": "disease",
+              "operator": "eq",
+              "value": "OSCC"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": 4,
+    "category": "Nested OR Logic",
+    "orchestrator_query": "table_name: tcga_exome_somatic_variants | variant_type: SNP | gene: [TP53 OR BRCA1 OR EGFR]",
+    "expected_output": {
+      "table_name": "tcga_exome_somatic_variants",
+      "request_body": {
+        "filters": {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "variant_type",
+              "operator": "eq",
+              "value": "SNP"
+            },
+            {
+              "logic": "OR",
+              "conditions": [
+                {
+                  "column": "gene",
+                  "operator": "eq",
+                  "value": "TP53"
+                },
+                {
+                  "column": "gene",
+                  "operator": "eq",
+                  "value": "BRCA1"
+                },
+                {
+                  "column": "gene",
+                  "operator": "eq",
+                  "value": "EGFR"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": 5,
+    "category": "Text Search Only",
+    "orchestrator_query": "table_name: journal_exome_somatic_variants | search_term: deletion",
+    "expected_output": {
+      "table_name": "journal_exome_somatic_variants",
+      "request_body": {
+        "term": "deletion"
+      }
+    }
+  },
+  {
+    "id": 6,
+    "category": "Text Search - Column Restricted",
+    "orchestrator_query": "table_name: journal_exome_somatic_variants | search_term: p.V600E | search_columns: [protein_change]",
+    "expected_output": {
+      "table_name": "journal_exome_somatic_variants",
+      "request_body": {
+        "term": "p.V600E",
+        "search_columns": ["protein_change"]
+      }
+    }
+  },
+  {
+    "id": 7,
+    "category": "Filters + Text Search",
+    "orchestrator_query": "table_name: nibmg_exome_somatic_variants | gene: TP53 | disease: OSCC | search_term: pathogenic",
+    "expected_output": {
+      "table_name": "nibmg_exome_somatic_variants",
+      "request_body": {
+        "filters": {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "gene",
+              "operator": "eq",
+              "value": "TP53"
+            },
+            {
+              "column": "disease",
+              "operator": "eq",
+              "value": "OSCC"
+            }
+          ]
+        },
+        "term": "pathogenic"
+      }
+    }
+  },
+  {
+    "id": 8,
+    "category": "Filters + Sorting",
+    "orchestrator_query": "table_name: tcga_exome_somatic_variants | variant_type: SNP | sort_by: start | sort_order: desc",
+    "expected_output": {
+      "table_name": "tcga_exome_somatic_variants",
+      "request_body": {
+        "filters": {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "variant_type",
+              "operator": "eq",
+              "value": "SNP"
+            }
+          ]
+        },
+        "sort_by": "start",
+        "sort_order": "desc"
+      }
+    }
+  },
+  {
+    "id": 9,
+    "category": "Filters + Pagination",
+    "orchestrator_query": "table_name: nibmg_wg_somatic_variants | variant_class: Missense_Mutation | page: 3 | page_size: 100",
+    "expected_output": {
+      "table_name": "nibmg_wg_somatic_variants",
+      "request_body": {
+        "filters": {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "variant_class",
+              "operator": "eq",
+              "value": "Missense_Mutation"
+            }
+          ]
+        },
+        "page": 3,
+        "page_size": 100
+      }
+    }
+  },
+  {
+    "id": 10,
+    "category": "Complex - All Parameters",
+    "orchestrator_query": "table_name: nibmg_exome_somatic_variants | gene: [TP53, BRCA1] | variant_type: SNP | search_term: damaging | sort_by: start | sort_order: asc | page: 1 | page_size: 50",
+    "expected_output": {
+      "table_name": "nibmg_exome_somatic_variants",
+      "request_body": {
+        "filters": {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "gene",
+              "operator": "in",
+              "value": ["TP53", "BRCA1"]
+            },
+            {
+              "column": "variant_type",
+              "operator": "eq",
+              "value": "SNP"
+            }
+          ]
+        },
+        "term": "damaging",
+        "sort_by": "start",
+        "sort_order": "asc",
+        "page": 1,
+        "page_size": 50
+      }
+    }
+  },
+  {
+    "id": 11,
+    "category": "Variant Class Filter",
+    "orchestrator_query": "table_name: tcga_exome_somatic_variants | variant_class: Frame_Shift_Del",
+    "expected_output": {
+      "table_name": "tcga_exome_somatic_variants",
+      "request_body": {
+        "filters": {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "variant_class",
+              "operator": "eq",
+              "value": "Frame_Shift_Del"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": 12,
+    "category": "Multiple Variant Classes",
+    "orchestrator_query": "table_name: nibmg_exome_somatic_variants | variant_class: [Missense_Mutation, Frame_Shift_Del, In_Frame_Del]",
+    "expected_output": {
+      "table_name": "nibmg_exome_somatic_variants",
+      "request_body": {
+        "filters": {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "variant_class",
+              "operator": "in",
+              "value": ["Missense_Mutation", "Frame_Shift_Del", "In_Frame_Del"]
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": 13,
+    "category": "Chromosome Filter",
+    "orchestrator_query": "table_name: journal_exome_somatic_variants | chromosome: chr17 | gene: TP53",
+    "expected_output": {
+      "table_name": "journal_exome_somatic_variants",
+      "request_body": {
+        "filters": {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "chromosome",
+              "operator": "eq",
+              "value": "chr17"
+            },
+            {
+              "column": "gene",
+              "operator": "eq",
+              "value": "TP53"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": 14,
+    "category": "Multiple Chromosomes",
+    "orchestrator_query": "table_name: tcga_exome_somatic_variants | chromosome: [chr17, chr13, chr19]",
+    "expected_output": {
+      "table_name": "tcga_exome_somatic_variants",
+      "request_body": {
+        "filters": {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "chromosome",
+              "operator": "in",
+              "value": ["chr17", "chr13", "chr19"]
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": 15,
+    "category": "Patient/Sample Filter",
+    "orchestrator_query": "table_name: nibmg_exome_somatic_variants | tumor_sample_barcode: OSCC_001",
+    "expected_output": {
+      "table_name": "nibmg_exome_somatic_variants",
+      "request_body": {
+        "filters": {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "tumor_sample_barcode",
+              "operator": "eq",
+              "value": "OSCC_001"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": 16,
+    "category": "Multiple Patient Samples",
+    "orchestrator_query": "table_name: nibmg_wg_somatic_variants | tumor_sample_barcode: [OSCC_001, OSCC_002, OSCC_003]",
+    "expected_output": {
+      "table_name": "nibmg_wg_somatic_variants",
+      "request_body": {
+        "filters": {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "tumor_sample_barcode",
+              "operator": "in",
+              "value": ["OSCC_001", "OSCC_002", "OSCC_003"]
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": 17,
+    "category": "Multiple Variant Types",
+    "orchestrator_query": "table_name: tcga_exome_somatic_variants | variant_type: [SNP, INS, DEL]",
+    "expected_output": {
+      "table_name": "tcga_exome_somatic_variants",
+      "request_body": {
+        "filters": {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "variant_type",
+              "operator": "in",
+              "value": ["SNP", "INS", "DEL"]
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": 18,
+    "category": "Disease Filter",
+    "orchestrator_query": "table_name: nibmg_exome_somatic_variants | disease: OSCC",
+    "expected_output": {
+      "table_name": "nibmg_exome_somatic_variants",
+      "request_body": {
+        "filters": {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "disease",
+              "operator": "eq",
+              "value": "OSCC"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": 19,
+    "category": "Text Search - Multiple Columns",
+    "orchestrator_query": "table_name: journal_exome_somatic_variants | search_term: frameshift | search_columns: [variant_class, protein_change, genome_change]",
+    "expected_output": {
+      "table_name": "journal_exome_somatic_variants",
+      "request_body": {
+        "term": "frameshift",
+        "search_columns": ["variant_class", "protein_change", "genome_change"]
+      }
+    }
+  },
+  {
+    "id": 20,
+    "category": "Complex Nested OR Logic",
+    "orchestrator_query": "table_name: nibmg_exome_somatic_variants | disease: OSCC | variant_type: SNP | gene: [TP53 OR BRCA1 OR CDKN2A] | variant_class: Missense_Mutation",
+    "expected_output": {
+      "table_name": "nibmg_exome_somatic_variants",
+      "request_body": {
+        "filters": {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "disease",
+              "operator": "eq",
+              "value": "OSCC"
+            },
+            {
+              "column": "variant_type",
+              "operator": "eq",
+              "value": "SNP"
+            },
+            {
+              "logic": "OR",
+              "conditions": [
+                {
+                  "column": "gene",
+                  "operator": "eq",
+                  "value": "TP53"
+                },
+                {
+                  "column": "gene",
+                  "operator": "eq",
+                  "value": "BRCA1"
+                },
+                {
+                  "column": "gene",
+                  "operator": "eq",
+                  "value": "CDKN2A"
+                }
+              ]
+            },
+            {
+              "column": "variant_class",
+              "operator": "eq",
+              "value": "Missense_Mutation"
+            }
+          ]
+        }
+      }
+    }
+  },
+  {
+    "id": 21,
+    "category": "Sorting Only",
+    "orchestrator_query": "table_name: tcga_exome_somatic_variants | sort_by: gene | sort_order: asc",
+    "expected_output": {
+      "table_name": "tcga_exome_somatic_variants",
+      "request_body": {
+        "sort_by": "gene",
+        "sort_order": "asc"
+      }
+    }
+  },
+  {
+    "id": 22,
+    "category": "Pagination Only",
+    "orchestrator_query": "table_name: journal_exome_somatic_variants | page: 5 | page_size: 200",
+    "expected_output": {
+      "table_name": "journal_exome_somatic_variants",
+      "request_body": {
+        "page": 5,
+        "page_size": 200
+      }
+    }
+  },
+  {
+    "id": 23,
+    "category": "Protein Change Search",
+    "orchestrator_query": "table_name: tcga_exome_somatic_variants | search_term: p.R273H | search_columns: [protein_change]",
+    "expected_output": {
+      "table_name": "tcga_exome_somatic_variants",
+      "request_body": {
+        "term": "p.R273H",
+        "search_columns": ["protein_change"]
+      }
+    }
+  },
+  {
+    "id": 24,
+    "category": "Genome Change Search",
+    "orchestrator_query": "table_name: nibmg_exome_somatic_variants | search_term: chr17:7577121 | search_columns: [genome_change]",
+    "expected_output": {
+      "table_name": "nibmg_exome_somatic_variants",
+      "request_body": {
+        "term": "chr17:7577121",
+        "search_columns": ["genome_change"]
+      }
+    }
+  },
+  {
+    "id": 25,
+    "category": "Filters + Text + Sort",
+    "orchestrator_query": "table_name: journal_exome_somatic_variants | gene: TP53  | sort_by: start | sort_order: asc",
+    "expected_output": {
+      "table_name": "journal_exome_somatic_variants",
+      "request_body": {
+        "filters": {
+          "logic": "AND",
+          "conditions": [
+            {
+              "column": "gene",
+              "operator": "eq",
+              "value": "TP53"
+            }
+          ]
+        },
+        "sort_by": "start",
+        "sort_order": "asc"
+      }
+    }
+  }
+]
