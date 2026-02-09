@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, ValidationError
 from app.agents.orchestrator import orchestrator_agent
 from app.agents.aggregate_combination import concate_aggregate_agent
 from app.api.aggregate_combination import generic_concatenated_aggregate
+from langtrace_python_sdk.utils.with_root_span import with_langtrace_root_span
 
 
 # =========================
@@ -110,6 +111,7 @@ class VocalResearchWorkflow(Workflow):
                 final_result = event["data"]
         return final_result if final_result else {"error": "No result produced"}
 
+    @with_langtrace_root_span()
     async def run_stream(
         self, query: str, db: Any
     ) -> AsyncGenerator[Dict[str, Any], None]:
