@@ -1,0 +1,967 @@
+{
+  "total_tests": 25,
+  "passed": 0,
+  "failed": 25,
+  "errors": 0,
+  "average_score": 0.0,
+  "test_results": [
+    {
+      "id": 1,
+      "category": "Single Structured Filter",
+      "query": "table_name: tcga_exome_somatic_variants | gene: TP53",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Unexpected response type: <class 'agno.run.agent.RunOutput'>",
+      "issues": [
+        "Unknown response format"
+      ],
+      "suggestions": [
+        "Review judge agent configuration"
+      ],
+      "expected": {
+        "table_name": "tcga_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "column": "gene",
+                "operator": "eq",
+                "value": "TP53"
+              }
+            ]
+          }
+        }
+      },
+      "actual": {
+        "table_name": "tcga_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "value": "TP53",
+                "column": "gene",
+                "operator": "eq"
+              }
+            ]
+          },
+          "genomic_filter": null,
+          "term": null,
+          "search_columns": null,
+          "page": 1,
+          "page_size": 10,
+          "sort_by": null,
+          "sort_order": "asc"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "category": "Multiple Values - IN Operator",
+      "query": "table_name: nibmg_exome_somatic_variants | gene: [TP53, BRCA1, BRCA2, EGFR]",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Unexpected response type: <class 'agno.run.agent.RunOutput'>",
+      "issues": [
+        "Unknown response format"
+      ],
+      "suggestions": [
+        "Review judge agent configuration"
+      ],
+      "expected": {
+        "table_name": "nibmg_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "column": "gene",
+                "operator": "in",
+                "value": [
+                  "TP53",
+                  "BRCA1",
+                  "BRCA2",
+                  "EGFR"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "actual": {
+        "table_name": "nibmg_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "value": [
+                  "TP53",
+                  "BRCA1",
+                  "BRCA2",
+                  "EGFR"
+                ],
+                "column": "gene",
+                "operator": "in"
+              }
+            ]
+          },
+          "genomic_filter": null,
+          "term": null,
+          "search_columns": null,
+          "page": 1,
+          "page_size": 10,
+          "sort_by": null,
+          "sort_order": "asc"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "category": "Multiple Columns - AND Logic",
+      "query": "table_name: nibmg_exome_somatic_variants | gene: TP53 | variant_type: SNP | disease: OSCC",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Unexpected response type: <class 'agno.run.agent.RunOutput'>",
+      "issues": [
+        "Unknown response format"
+      ],
+      "suggestions": [
+        "Review judge agent configuration"
+      ],
+      "expected": {
+        "table_name": "nibmg_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "column": "gene",
+                "operator": "eq",
+                "value": "TP53"
+              },
+              {
+                "column": "variant_type",
+                "operator": "eq",
+                "value": "SNP"
+              },
+              {
+                "column": "disease",
+                "operator": "eq",
+                "value": "OSCC"
+              }
+            ]
+          }
+        }
+      },
+      "actual": {
+        "table_name": "nibmg_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "value": "TP53",
+                "column": "gene",
+                "operator": "eq"
+              },
+              {
+                "value": "SNP",
+                "column": "variant_type",
+                "operator": "eq"
+              },
+              {
+                "value": "OSCC",
+                "column": "disease",
+                "operator": "eq"
+              }
+            ]
+          },
+          "genomic_filter": null,
+          "term": null,
+          "search_columns": null,
+          "page": 1,
+          "page_size": 10,
+          "sort_by": null,
+          "sort_order": "asc"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "category": "Nested OR Logic",
+      "query": "table_name: tcga_exome_somatic_variants | variant_type: SNP | gene: [TP53 OR BRCA1 OR EGFR]",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Unexpected response type: <class 'agno.run.agent.RunOutput'>",
+      "issues": [
+        "Unknown response format"
+      ],
+      "suggestions": [
+        "Review judge agent configuration"
+      ],
+      "expected": {
+        "table_name": "tcga_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "column": "variant_type",
+                "operator": "eq",
+                "value": "SNP"
+              },
+              {
+                "logic": "OR",
+                "conditions": [
+                  {
+                    "column": "gene",
+                    "operator": "eq",
+                    "value": "TP53"
+                  },
+                  {
+                    "column": "gene",
+                    "operator": "eq",
+                    "value": "BRCA1"
+                  },
+                  {
+                    "column": "gene",
+                    "operator": "eq",
+                    "value": "EGFR"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "actual": {
+        "table_name": "tcga_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "value": "SNP",
+                "column": "variant_type",
+                "operator": "eq"
+              },
+              {
+                "logic": "OR",
+                "conditions": [
+                  {
+                    "value": "TP53",
+                    "column": "gene",
+                    "operator": "eq"
+                  },
+                  {
+                    "value": "BRCA1",
+                    "column": "gene",
+                    "operator": "eq"
+                  },
+                  {
+                    "value": "EGFR",
+                    "column": "gene",
+                    "operator": "eq"
+                  }
+                ]
+              }
+            ]
+          },
+          "genomic_filter": null,
+          "term": null,
+          "search_columns": null,
+          "page": 1,
+          "page_size": 10,
+          "sort_by": null,
+          "sort_order": "asc"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "category": "Text Search Only",
+      "query": "table_name: journal_exome_somatic_variants | search_term: deletion",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Unexpected response type: <class 'agno.run.agent.RunOutput'>",
+      "issues": [
+        "Unknown response format"
+      ],
+      "suggestions": [
+        "Review judge agent configuration"
+      ],
+      "expected": {
+        "table_name": "journal_exome_somatic_variants",
+        "request_body": {
+          "term": "deletion"
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 6,
+      "category": "Text Search - Column Restricted",
+      "query": "table_name: journal_exome_somatic_variants | search_term: p.V600E | search_columns: [protein_change]",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "journal_exome_somatic_variants",
+        "request_body": {
+          "term": "p.V600E",
+          "search_columns": [
+            "protein_change"
+          ]
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 7,
+      "category": "Filters + Text Search",
+      "query": "table_name: nibmg_exome_somatic_variants | gene: TP53 | disease: OSCC | search_term: pathogenic",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "nibmg_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "column": "gene",
+                "operator": "eq",
+                "value": "TP53"
+              },
+              {
+                "column": "disease",
+                "operator": "eq",
+                "value": "OSCC"
+              }
+            ]
+          },
+          "term": "pathogenic"
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 8,
+      "category": "Filters + Sorting",
+      "query": "table_name: tcga_exome_somatic_variants | variant_type: SNP | sort_by: start | sort_order: desc",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "tcga_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "column": "variant_type",
+                "operator": "eq",
+                "value": "SNP"
+              }
+            ]
+          },
+          "sort_by": "start",
+          "sort_order": "desc"
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 9,
+      "category": "Filters + Pagination",
+      "query": "table_name: nibmg_wg_somatic_variants | variant_class: Missense_Mutation | page: 3 | page_size: 100",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "nibmg_wg_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "column": "variant_class",
+                "operator": "eq",
+                "value": "Missense_Mutation"
+              }
+            ]
+          },
+          "page": 3,
+          "page_size": 100
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 10,
+      "category": "Complex - All Parameters",
+      "query": "table_name: nibmg_exome_somatic_variants | gene: [TP53, BRCA1] | variant_type: SNP | search_term: damaging | sort_by: start | sort_order: asc | page: 1 | page_size: 50",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "nibmg_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "column": "gene",
+                "operator": "in",
+                "value": [
+                  "TP53",
+                  "BRCA1"
+                ]
+              },
+              {
+                "column": "variant_type",
+                "operator": "eq",
+                "value": "SNP"
+              }
+            ]
+          },
+          "term": "damaging",
+          "sort_by": "start",
+          "sort_order": "asc",
+          "page": 1,
+          "page_size": 50
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 11,
+      "category": "Variant Class Filter",
+      "query": "table_name: tcga_exome_somatic_variants | variant_class: Frame_Shift_Del",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "tcga_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "column": "variant_class",
+                "operator": "eq",
+                "value": "Frame_Shift_Del"
+              }
+            ]
+          }
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 12,
+      "category": "Multiple Variant Classes",
+      "query": "table_name: nibmg_exome_somatic_variants | variant_class: [Missense_Mutation, Frame_Shift_Del, In_Frame_Del]",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "nibmg_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "column": "variant_class",
+                "operator": "in",
+                "value": [
+                  "Missense_Mutation",
+                  "Frame_Shift_Del",
+                  "In_Frame_Del"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 13,
+      "category": "Chromosome Filter",
+      "query": "table_name: journal_exome_somatic_variants | chromosome: chr17 | gene: TP53",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "journal_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "column": "chromosome",
+                "operator": "eq",
+                "value": "chr17"
+              },
+              {
+                "column": "gene",
+                "operator": "eq",
+                "value": "TP53"
+              }
+            ]
+          }
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 14,
+      "category": "Multiple Chromosomes",
+      "query": "table_name: tcga_exome_somatic_variants | chromosome: [chr17, chr13, chr19]",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "tcga_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "column": "chromosome",
+                "operator": "in",
+                "value": [
+                  "chr17",
+                  "chr13",
+                  "chr19"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 15,
+      "category": "Patient/Sample Filter",
+      "query": "table_name: nibmg_exome_somatic_variants | tumor_sample_barcode: OSCC_001",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "nibmg_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "column": "tumor_sample_barcode",
+                "operator": "eq",
+                "value": "OSCC_001"
+              }
+            ]
+          }
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 16,
+      "category": "Multiple Patient Samples",
+      "query": "table_name: nibmg_wg_somatic_variants | tumor_sample_barcode: [OSCC_001, OSCC_002, OSCC_003]",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "nibmg_wg_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "column": "tumor_sample_barcode",
+                "operator": "in",
+                "value": [
+                  "OSCC_001",
+                  "OSCC_002",
+                  "OSCC_003"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 17,
+      "category": "Multiple Variant Types",
+      "query": "table_name: tcga_exome_somatic_variants | variant_type: [SNP, INS, DEL]",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "tcga_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "column": "variant_type",
+                "operator": "in",
+                "value": [
+                  "SNP",
+                  "INS",
+                  "DEL"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 18,
+      "category": "Disease Filter",
+      "query": "table_name: nibmg_exome_somatic_variants | disease: OSCC",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "nibmg_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "column": "disease",
+                "operator": "eq",
+                "value": "OSCC"
+              }
+            ]
+          }
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 19,
+      "category": "Text Search - Multiple Columns",
+      "query": "table_name: journal_exome_somatic_variants | search_term: frameshift | search_columns: [variant_class, protein_change, genome_change]",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "journal_exome_somatic_variants",
+        "request_body": {
+          "term": "frameshift",
+          "search_columns": [
+            "variant_class",
+            "protein_change",
+            "genome_change"
+          ]
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 20,
+      "category": "Complex Nested OR Logic",
+      "query": "table_name: nibmg_exome_somatic_variants | disease: OSCC | variant_type: SNP | gene: [TP53 OR BRCA1 OR CDKN2A] | variant_class: Missense_Mutation",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "nibmg_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "column": "disease",
+                "operator": "eq",
+                "value": "OSCC"
+              },
+              {
+                "column": "variant_type",
+                "operator": "eq",
+                "value": "SNP"
+              },
+              {
+                "logic": "OR",
+                "conditions": [
+                  {
+                    "column": "gene",
+                    "operator": "eq",
+                    "value": "TP53"
+                  },
+                  {
+                    "column": "gene",
+                    "operator": "eq",
+                    "value": "BRCA1"
+                  },
+                  {
+                    "column": "gene",
+                    "operator": "eq",
+                    "value": "CDKN2A"
+                  }
+                ]
+              },
+              {
+                "column": "variant_class",
+                "operator": "eq",
+                "value": "Missense_Mutation"
+              }
+            ]
+          }
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 21,
+      "category": "Sorting Only",
+      "query": "table_name: tcga_exome_somatic_variants | sort_by: gene | sort_order: asc",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "tcga_exome_somatic_variants",
+        "request_body": {
+          "sort_by": "gene",
+          "sort_order": "asc"
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 22,
+      "category": "Pagination Only",
+      "query": "table_name: journal_exome_somatic_variants | page: 5 | page_size: 200",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "journal_exome_somatic_variants",
+        "request_body": {
+          "page": 5,
+          "page_size": 200
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 23,
+      "category": "Protein Change Search",
+      "query": "table_name: tcga_exome_somatic_variants | search_term: p.R273H | search_columns: [protein_change]",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "tcga_exome_somatic_variants",
+        "request_body": {
+          "term": "p.R273H",
+          "search_columns": [
+            "protein_change"
+          ]
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 24,
+      "category": "Genome Change Search",
+      "query": "table_name: nibmg_exome_somatic_variants | search_term: chr17:7577121 | search_columns: [genome_change]",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "nibmg_exome_somatic_variants",
+        "request_body": {
+          "term": "chr17:7577121",
+          "search_columns": [
+            "genome_change"
+          ]
+        }
+      },
+      "actual": "Operation cancelled by user"
+    },
+    {
+      "id": 25,
+      "category": "Filters + Text + Sort",
+      "query": "table_name: journal_exome_somatic_variants | gene: TP53  | sort_by: start | sort_order: asc",
+      "status": "\u2717 FAILED",
+      "score": 0.0,
+      "is_correct": false,
+      "reasoning": "Failed to parse string response: Expecting value: line 1 column 1 (char 0)",
+      "issues": [
+        "Response parsing failed"
+      ],
+      "suggestions": [
+        "Check judge agent JSON output"
+      ],
+      "expected": {
+        "table_name": "journal_exome_somatic_variants",
+        "request_body": {
+          "filters": {
+            "logic": "AND",
+            "conditions": [
+              {
+                "column": "gene",
+                "operator": "eq",
+                "value": "TP53"
+              }
+            ]
+          },
+          "sort_by": "start",
+          "sort_order": "asc"
+        }
+      },
+      "actual": "Operation cancelled by user"
+    }
+  ]
+}
