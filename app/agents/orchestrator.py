@@ -2,10 +2,12 @@ from typing import List
 from pathlib import Path
 from agno.agent import Agent
 from pydantic import BaseModel, Field
-from app.session import ai_engine_pro as ai_engine
+from app.session import ai_shakti_lite_engine as ai_engine
 
 BASE_DIR = Path(__file__).resolve().parent
-SYSTEM_PROMPT = (BASE_DIR / "prompts" / "orchestrator.md").read_text(encoding="utf-8")
+SYSTEM_PROMPT = (BASE_DIR / "prompts" / "orchestrator_dt.md").read_text(
+    encoding="utf-8"
+)
 
 
 class SimplePlanStep(BaseModel):
