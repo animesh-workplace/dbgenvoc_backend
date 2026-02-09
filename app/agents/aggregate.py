@@ -2,7 +2,7 @@ from pathlib import Path
 from agno.agent import Agent
 from pydantic import BaseModel, Field
 from app.api.aggregate import AggregationRequest
-from app.session import ai_engine_lite as ai_engine
+from app.session import ai_shakti_lite_engine as ai_engine
 
 BASE_DIR = Path(__file__).resolve().parent
 SYSTEM_PROMPT = (BASE_DIR / "prompts" / "aggregate.md").read_text(encoding="utf-8")
