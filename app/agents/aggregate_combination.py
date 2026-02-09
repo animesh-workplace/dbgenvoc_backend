@@ -1,7 +1,7 @@
 from pathlib import Path
 from agno.agent import Agent
 from pydantic import BaseModel, Field
-from app.session import ai_engine_lite as ai_engine
+from app.session import ai_shakti_lite_engine as ai_engine
 from app.api.aggregate_combination import ConcatenatedAggregationRequest
 
 BASE_DIR = Path(__file__).resolve().parent
