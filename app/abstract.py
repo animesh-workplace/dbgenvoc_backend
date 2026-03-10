@@ -59,6 +59,7 @@ class BaseVariantModel(Base):
     disease = Column(String(100))
     ncbi_build = Column(String(6))
     dbsnp_rs = Column(String(200))
+    table_name = Column(String(50))
     ref_allele = Column(String(50))
     reference = Column(String(200))
     entrez_gene_id = Column(Integer)
@@ -73,6 +74,7 @@ class BaseVariantModel(Base):
     transcript_strand = Column(String(2))
     tumor_seq_allele2 = Column(String(50))
     transcript_position = Column(String(20))
+    trinucleotide_context = Column(String(3))
     annotation_transcript = Column(String(20))
     tumor_sample_barcode = Column(
         String(20), ForeignKey("patient_barcode.id"), index=True
@@ -91,10 +93,28 @@ class BaseVariantModel(Base):
     @declared_attr
     def __table_args__(cls):
         return (
-            Index(f"index_{cls.__tablename__}_gene_chrom", "gene", "chrom"),
-            Index(f"index_{cls.__tablename__}_chrom_start", "chrom", "start"),
+            # 1️⃣ Dataset + Gene (most common statistical query)
+            Index(f"idx_{cls.__tablename__}_dataset_gene", "table_name", "gene"),
+            # 2️⃣ Dataset + Chrom + Start (range queries inside dataset)
             Index(
-                f"index_{cls.__tablename__}_chrom_start_end", "chrom", "start", "end"
+                f"idx_{cls.__tablename__}_dataset_chrom_start",
+                "table_name",
+                "chrom",
+                "start",
+            ),
+            # 3️⃣ Chrom + Start + End (global range queries)
+            Index(
+                f"idx_{cls.__tablename__}_dataset_chrom_start_end",
+                "table_name",
+                "chrom",
+                "start",
+                "end",
+            ),
+            # 4️⃣ Dataset + Variant Type (useful for stats)
+            Index(
+                f"idx_{cls.__tablename__}_dataset_varianttype",
+                "table_name",
+                "variant_type",
             ),
         )
 
