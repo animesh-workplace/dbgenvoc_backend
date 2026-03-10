@@ -5,6 +5,7 @@ from sqlalchemy import (
     Column,
     Boolean,
     Integer,
+    ForeignKey,
     DateTime,
 )
 from app.abstract import (
@@ -54,139 +55,190 @@ class ApiToken(Base):
     expires_at = Column(DateTime, nullable=True)  # NULL means no expiration
 
 
-# Section for Journal Models
-class JournalExomeSomaticVariant(BaseVariantModel):
-    __tablename__ = "journal_exome_somatic_variants"
+class VariantData(BaseVariantModel):
+    __tablename__ = "variant_data"
 
     remarks = Column(String(500))
 
 
-class JournalExomeSomaticVariantOncoplot(BaseOncoplotModel):
-    __tablename__ = "journal_exome_somatic_variant_oncoplot"
+class TranscriptData(Base):
+    __tablename__ = "transcript_data"
+
+    gene_id = Column(String(20))
+    refseq_id = Column(String(20))
+    protein_id = Column(String(20))
+    uniprot_id = Column(String(20))
+    protein_length = Column(Integer)
+    transcript_id = Column(String(50), primary_key=True)
+    gene = Column(String(20), ForeignKey("genelist.gene"), index=True)
 
 
-class JournalExomeSomaticGeneInteraction(BaseGeneInteractionModel):
-    __tablename__ = "journal_exome_somatic_gene_interaction"
+class ExonData(Base):
+    __tablename__ = "exon_data"
+
+    end = Column(Integer)
+    rank = Column(Integer)
+    start = Column(Integer)
+    strand = Column(Integer)
+    version = Column(Integer)
+    exon_id = Column(String(20))
+    transcript_id = Column(
+        String(20),
+        ForeignKey("transcript_data.transcript_id"),
+        index=True,
+        primary_key=True,
+    )
 
 
-class JournalExomeSomaticSampleTMB(BaseSampleTMBModel):
-    __tablename__ = "journal_exome_somatic_sample_tmb"
+class DomainData(Base):
+    __tablename__ = "domain_data"
+
+    end = Column(Integer)
+    start = Column(Integer)
+    name = Column(String(100))
+    domain_name = Column(String(20))
+    description = Column(String(200))
+    transcript_id = Column(
+        String(20),
+        ForeignKey("transcript_data.transcript_id"),
+        index=True,
+        primary_key=True,
+    )
 
 
-class JournalExomeSomaticSampleTiTv(BaseSampleTiTvModel):
-    __tablename__ = "journal_exome_somatic_sample_titv"
+# # Section for Journal Models
+# class JournalExomeSomaticVariant(BaseVariantModel):
+#     __tablename__ = "journal_exome_somatic_variants"
+
+#     remarks = Column(String(500))
 
 
-# Section for TCGA Models
-class TCGAExomeSomaticVariant(BaseVariantModel):
-    __tablename__ = "tcga_exome_somatic_variants"
-
-    remarks = Column(String(500))
+# class JournalExomeSomaticVariantOncoplot(BaseOncoplotModel):
+#     __tablename__ = "journal_exome_somatic_variant_oncoplot"
 
 
-class TCGAExomeSomaticVariantOncoplot(BaseOncoplotModel):
-    __tablename__ = "tcga_exome_somatic_variant_oncoplot"
+# class JournalExomeSomaticGeneInteraction(BaseGeneInteractionModel):
+#     __tablename__ = "journal_exome_somatic_gene_interaction"
 
 
-class TCGAExomeSomaticGeneInteraction(BaseGeneInteractionModel):
-    __tablename__ = "tcga_exome_somatic_gene_interaction"
+# class JournalExomeSomaticSampleTMB(BaseSampleTMBModel):
+#     __tablename__ = "journal_exome_somatic_sample_tmb"
 
 
-class TCGAExomeSomaticSampleTMB(BaseSampleTMBModel):
-    __tablename__ = "tcga_exome_somatic_sample_tmb"
+# class JournalExomeSomaticSampleTiTv(BaseSampleTiTvModel):
+#     __tablename__ = "journal_exome_somatic_sample_titv"
 
 
-class TCGAExomeSomaticSampleTiTv(BaseSampleTiTvModel):
-    __tablename__ = "tcga_exome_somatic_sample_titv"
+# # Section for TCGA Models
+# class TCGAExomeSomaticVariant(BaseVariantModel):
+#     __tablename__ = "tcga_exome_somatic_variants"
+
+#     remarks = Column(String(500))
 
 
-# Section for NIBMG Exome Somatic Tables
-class NIBMGExomeSomaticVariant(BaseVariantModel):
-    __tablename__ = "nibmg_exome_somatic_variants"
-
-    remarks = Column(String(500))
+# class TCGAExomeSomaticVariantOncoplot(BaseOncoplotModel):
+#     __tablename__ = "tcga_exome_somatic_variant_oncoplot"
 
 
-class NIBMGExomeSomaticVariantOncoplot(BaseOncoplotModel):
-    __tablename__ = "nibmg_exome_somatic_variant_oncoplot"
+# class TCGAExomeSomaticGeneInteraction(BaseGeneInteractionModel):
+#     __tablename__ = "tcga_exome_somatic_gene_interaction"
 
 
-class NIBMGExomeSomaticGeneInteraction(BaseGeneInteractionModel):
-    __tablename__ = "nibmg_exome_somatic_gene_interaction"
+# class TCGAExomeSomaticSampleTMB(BaseSampleTMBModel):
+#     __tablename__ = "tcga_exome_somatic_sample_tmb"
 
 
-class NIBMGExomeSomaticSampleTMB(BaseSampleTMBModel):
-    __tablename__ = "nibmg_exome_somatic_sample_tmb"
+# class TCGAExomeSomaticSampleTiTv(BaseSampleTiTvModel):
+#     __tablename__ = "tcga_exome_somatic_sample_titv"
 
 
-class NIBMGExomeSomaticSampleTiTv(BaseSampleTiTvModel):
-    __tablename__ = "nibmg_exome_somatic_sample_titv"
+# # Section for NIBMG Exome Somatic Tables
+# class NIBMGExomeSomaticVariant(BaseVariantModel):
+#     __tablename__ = "nibmg_exome_somatic_variants"
+
+#     remarks = Column(String(500))
 
 
-# Section for NIBMG Whole Genome Somatic Tables
-class NIBMGWgSomaticVariant(BaseVariantModel):
-    __tablename__ = "nibmg_wg_somatic_variants"
-
-    remarks = Column(String(500))
+# class NIBMGExomeSomaticVariantOncoplot(BaseOncoplotModel):
+#     __tablename__ = "nibmg_exome_somatic_variant_oncoplot"
 
 
-class NIBMGWgSomaticVariantOncoplot(BaseOncoplotModel):
-    __tablename__ = "nibmg_wg_somatic_variant_oncoplot"
+# class NIBMGExomeSomaticGeneInteraction(BaseGeneInteractionModel):
+#     __tablename__ = "nibmg_exome_somatic_gene_interaction"
 
 
-class NIBMGWgSomaticGeneInteraction(BaseGeneInteractionModel):
-    __tablename__ = "nibmg_wg_somatic_gene_interaction"
+# class NIBMGExomeSomaticSampleTMB(BaseSampleTMBModel):
+#     __tablename__ = "nibmg_exome_somatic_sample_tmb"
 
 
-class NIBMGWgSomaticSampleTMB(BaseSampleTMBModel):
-    __tablename__ = "nibmg_wg_somatic_sample_tmb"
+# class NIBMGExomeSomaticSampleTiTv(BaseSampleTiTvModel):
+#     __tablename__ = "nibmg_exome_somatic_sample_titv"
 
 
-class NIBMGWgSomaticSampleTiTv(BaseSampleTiTvModel):
-    __tablename__ = "nibmg_wg_somatic_sample_titv"
+# # Section for NIBMG Whole Genome Somatic Tables
+# class NIBMGWgSomaticVariant(BaseVariantModel):
+#     __tablename__ = "nibmg_wg_somatic_variants"
+
+#     remarks = Column(String(500))
 
 
-# Section for NIBMG Exome Germline Tables
-class NIBMGExomeGermlineVariant(BaseVariantModel):
-    __tablename__ = "nibmg_exome_germline_variants"
-
-    remarks = Column(String(500))
+# class NIBMGWgSomaticVariantOncoplot(BaseOncoplotModel):
+#     __tablename__ = "nibmg_wg_somatic_variant_oncoplot"
 
 
-class NIBMGExomeGermlineVariantOncoplot(BaseOncoplotModel):
-    __tablename__ = "nibmg_exome_germline_variant_oncoplot"
+# class NIBMGWgSomaticGeneInteraction(BaseGeneInteractionModel):
+#     __tablename__ = "nibmg_wg_somatic_gene_interaction"
 
 
-class NIBMGExomeGermlineGeneInteraction(BaseGeneInteractionModel):
-    __tablename__ = "nibmg_exome_germline_gene_interaction"
+# class NIBMGWgSomaticSampleTMB(BaseSampleTMBModel):
+#     __tablename__ = "nibmg_wg_somatic_sample_tmb"
 
 
-class NIBMGExomeGermlineSampleTMB(BaseSampleTMBModel):
-    __tablename__ = "nibmg_exome_germline_sample_tmb"
+# class NIBMGWgSomaticSampleTiTv(BaseSampleTiTvModel):
+#     __tablename__ = "nibmg_wg_somatic_sample_titv"
 
 
-class NIBMGExomeGermlineSampleTiTv(BaseSampleTiTvModel):
-    __tablename__ = "nibmg_exome_germline_sample_titv"
+# # Section for NIBMG Exome Germline Tables
+# class NIBMGExomeGermlineVariant(BaseVariantModel):
+#     __tablename__ = "nibmg_exome_germline_variants"
+
+#     remarks = Column(String(500))
 
 
-# Section for NIBMG Whole Genome Germline Tables
-class NIBMGWgGermlineVariant(BaseVariantModel):
-    __tablename__ = "nibmg_wg_germline_variants"
-
-    remarks = Column(String(500))
+# class NIBMGExomeGermlineVariantOncoplot(BaseOncoplotModel):
+#     __tablename__ = "nibmg_exome_germline_variant_oncoplot"
 
 
-class NIBMGWgGermlineVariantOncoplot(BaseOncoplotModel):
-    __tablename__ = "nibmg_wg_germline_variant_oncoplot"
+# class NIBMGExomeGermlineGeneInteraction(BaseGeneInteractionModel):
+#     __tablename__ = "nibmg_exome_germline_gene_interaction"
 
 
-class NIBMGWgGermlineGeneInteraction(BaseGeneInteractionModel):
-    __tablename__ = "nibmg_wg_germline_gene_interaction"
+# class NIBMGExomeGermlineSampleTMB(BaseSampleTMBModel):
+#     __tablename__ = "nibmg_exome_germline_sample_tmb"
 
 
-class NIBMGWgGermlineSampleTMB(BaseSampleTMBModel):
-    __tablename__ = "nibmg_wg_germline_sample_tmb"
+# class NIBMGExomeGermlineSampleTiTv(BaseSampleTiTvModel):
+#     __tablename__ = "nibmg_exome_germline_sample_titv"
 
 
-class NIBMGWgGermlineSampleTiTv(BaseSampleTiTvModel):
-    __tablename__ = "nibmg_wg_germline_sample_titv"
+# # Section for NIBMG Whole Genome Germline Tables
+# class NIBMGWgGermlineVariant(BaseVariantModel):
+#     __tablename__ = "nibmg_wg_germline_variants"
+
+#     remarks = Column(String(500))
+
+
+# class NIBMGWgGermlineVariantOncoplot(BaseOncoplotModel):
+#     __tablename__ = "nibmg_wg_germline_variant_oncoplot"
+
+
+# class NIBMGWgGermlineGeneInteraction(BaseGeneInteractionModel):
+#     __tablename__ = "nibmg_wg_germline_gene_interaction"
+
+
+# class NIBMGWgGermlineSampleTMB(BaseSampleTMBModel):
+#     __tablename__ = "nibmg_wg_germline_sample_tmb"
+
+
+# class NIBMGWgGermlineSampleTiTv(BaseSampleTiTvModel):
+#     __tablename__ = "nibmg_wg_germline_sample_titv"
