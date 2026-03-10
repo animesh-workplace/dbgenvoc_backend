@@ -6,15 +6,25 @@ from agno.models.nvidia import Nvidia
 from agno.models.google import Gemini
 from agno.models.aws import AwsBedrock
 from agno.models.openai import OpenAILike
-from langtrace_python_sdk import langtrace
+from langfuse import get_client
+
+# from langtrace_python_sdk import langtrace
 from sqlalchemy.orm import registry, sessionmaker
 
 load_dotenv()
 SQLALCHEMY_DATABASE_URL = "sqlite:///database/database.sqlite3"
 
-langtrace.init(
-    api_key="e46c7e7a3da2478c4864f3c46beab8a00416a4fbfcfd175390e159e731b97a91"
-)
+# langtrace.init(
+#     api_key="e46c7e7a3da2478c4864f3c46beab8a00416a4fbfcfd175390e159e731b97a91"
+# )
+
+langfuse = get_client()
+
+# Verify connection
+if langfuse.auth_check():
+    print("Langfuse client is authenticated and ready!")
+else:
+    print("Authentication failed. Please check your credentials and host.")
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
