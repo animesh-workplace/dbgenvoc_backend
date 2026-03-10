@@ -1,5 +1,6 @@
 import json
 import asyncio
+from langfuse import observe
 from agno.utils.log import logger
 from agno.workflow import Workflow
 from app.api.search import generic_search
@@ -12,8 +13,8 @@ from pydantic import BaseModel, Field, ValidationError
 from app.agents.orchestrator import orchestrator_agent
 from app.agents.aggregate_combination import concate_aggregate_agent
 from app.api.aggregate_combination import generic_concatenated_aggregate
-from langtrace_python_sdk.utils.with_root_span import with_langtrace_root_span
 
+# from langtrace_python_sdk.utils.with_root_span import with_langtrace_root_span
 
 # =========================
 # PLAN SCHEMA
@@ -111,7 +112,8 @@ class VocalResearchWorkflow(Workflow):
                 final_result = event["data"]
         return final_result if final_result else {"error": "No result produced"}
 
-    @with_langtrace_root_span()
+    # @with_langtrace_root_span()
+    @observe(name="vocal_research_workflow")
     async def run_stream(
         self, query: str, db: Any
     ) -> AsyncGenerator[Dict[str, Any], None]:
